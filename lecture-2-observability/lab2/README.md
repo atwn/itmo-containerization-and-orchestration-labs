@@ -30,6 +30,33 @@ api (Spring Boot)
 отказывается. Можно было переключить весь WSL2 на cgroup v2 через `.wslconfig`, но это трогает всю машину
 ради одной лабы, поэтому просто взял версию, которая с cgroup v1 работает. Пин лежит в `deploy/kind-cluster.yaml`.
 
+## Предварительные требования
+
+Стенд можно собрать как на WSL2, так и на обычном Linux. Исходили из той конфигурации,
+которая была доступна у членов команды, работающих над лабой.
+
+### Для запуска на WSL2 (с дистрибутивом Debian 13)
+#### на хосте (Windows):
+1. Включить компонент "Подсистема Windows для Linux" на хосте
+1. Скачать и установить образ Debian  
+   `wsl --install Debian`  
+1. Установить Docker Desktop для Windows на хосте
+   ([инструкция](https://docs.docker.com/desktop/setup/install/windows-install/))
+   и включить интеграцию с WSL для нового образа в настройках Docker Desktop
+
+#### внутри дистрибутива (Debian 13 в WSL2):
+1. Установить kind и kubectl  
+   `sudo apt-get install -y kind kubectl`  
+1. Установить Helm ([интсрукция](https://helm.sh/docs/intro/install/#from-apt-debianubuntu))
+1. Установить PowerShell ([инструкция](https://learn.microsoft.com/en-us/powershell/scripting/install/install-debian?view=powershell-7.6))
+
+### Для запуска на Debian 13
+1. Установить Docker Engine ([инструкция](https://docs.docker.com/engine/install/debian/))
+1. Установить kind и kubectl  
+   `sudo apt-get install -y kind kubectl`  
+1. Установить Helm ([интсрукция](https://helm.sh/docs/intro/install/#from-apt-debianubuntu))
+1. Установить PowerShell ([инструкция](https://learn.microsoft.com/en-us/powershell/scripting/install/install-debian?view=powershell-7.6))
+
 ## Запуск
 
 ```powershell
