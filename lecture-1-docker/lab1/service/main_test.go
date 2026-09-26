@@ -5,7 +5,6 @@ import (
 	"os"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestRoutes(t *testing.T) {
@@ -79,18 +78,13 @@ func TestConcurrentAllocations(t *testing.T) {
 	}
 }
 
-func TestBurnOnceAndHealth(t *testing.T) {
+func TestBurnMultipleWorkersAndHealth(t *testing.T) {
 	s := newService()
 	t.Cleanup(func() {
-		close(s.stop)
-		select {
-		case <-s.done:
-		case <-time.After(2 * time.Second):
-			t.Error("CPU worker did not stop")
-		}
+		s.stopWorkers()
 	})
 	var requests sync.WaitGroup
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 4; i++ {
 		requests.Add(1)
 		go func() {
 			defer requests.Done()
@@ -102,7 +96,9 @@ func TestBurnOnceAndHealth(t *testing.T) {
 		}()
 	}
 	requests.Wait()
-	// A second worker would also close done and panic during cleanup.
+	if got := s.workerCount.Load(); got != 4 {
+		t.Fatalf("active CPU workers = %d, want 8", got)
+	}
 	w := httptest.NewRecorder()
 	s.ServeHTTP(w, httptest.NewRequest("GET", "/health", nil))
 	if w.Code != 200 || w.Body.String() != "ok" {

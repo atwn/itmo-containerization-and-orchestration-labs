@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 )
 
 const mib = 1024 * 1024
@@ -14,13 +15,14 @@ const mib = 1024 * 1024
 type service struct {
 	mu          sync.Mutex
 	allocations [][]byte
-	burnOnce    sync.Once
+	workers     sync.WaitGroup
+	stopOnce    sync.Once
+	workerCount atomic.Int64
 	stop        chan struct{}
-	done        chan struct{}
 }
 
 func newService() *service {
-	return &service{stop: make(chan struct{}), done: make(chan struct{})}
+	return &service{stop: make(chan struct{})}
 }
 
 func (s *service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -63,20 +65,27 @@ func (s *service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *service) startBurn() {
-	s.burnOnce.Do(func() {
-		go func() {
-			defer close(s.done)
-			// One runnable goroutine consumes roughly one core. The stop channel
-			// allows tests to clean up; production keeps running until exit.
-			for {
-				select {
-				case <-s.stop:
-					return
-				default:
-				}
+	s.workers.Add(1)
+	s.workerCount.Add(1)
+	go func() {
+		defer s.workers.Done()
+		defer s.workerCount.Add(-1)
+		// Одна постоянно готовая горутина потребляет примерно одно ядро.
+		for {
+			select {
+			case <-s.stop:
+				return
+			default:
 			}
-		}()
+		}
+	}()
+}
+
+func (s *service) stopWorkers() {
+	s.stopOnce.Do(func() {
+		close(s.stop)
 	})
+	s.workers.Wait()
 }
 
 func main() {
