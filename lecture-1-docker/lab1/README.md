@@ -29,10 +29,10 @@ go build -o /tmp/api .
 |:----------|:--------------|:----------|
 |**pgrep**          | `pgrep -xn /tmp/api`  | определяет PID запущенного процесса по его имени (`/tmp/api`) |
 |**pstree**         | `pstree -aps <pid>`   | строит дерево процесса, включая все родительские и дочерние процессы |
-|**htop** [^htop1]  | `htop -s PID -t -p <pid>` | отслеживаем ресурсы, используемые процессом (PID): RES - память, CPU%, Load Average - процессор |
+|**htop** [^htop]  | `htop -s PID -t -p <pid>` | отслеживаем ресурсы, используемые процессом (PID): RES - память, CPU%, Load Average - процессор |
 |**curl**           | `curl -X GET http://localhost:8080/eat?mb=100` <br> `curl -X GET http://localhost:8080/burn` | дёргаем ручки |
 
-[^htop1]: [гайд](https://spin.atomicobject.com/htop-guide/) по `htop`
+[^htop]: [гайд](https://spin.atomicobject.com/htop-guide/) по `htop`
 
 #### Результат
 ![Процесс /tmp/api запущенный напрямую на хосте](./scrs/part1_01.png "Baseline")
@@ -48,14 +48,22 @@ PID процесса 34774, общее потребление CPU под наг�
 
 | Namespace | Инициализация | Проверка на хосте| Проверка внутри контейнера | Результат | Примечания    |
 |:----------|:--------------|:-----------------|:---------------------------|:----------|:--------------|
-| **pid**   | `unshare --pid --fork --mount-proc bash`  | `nsenter -t $(pgrep -xn bash) --pid --mount -- ps -ef` | `ps -ef` | <img src="./scrs/part2_01.png" width=100 /> | • опция `--fork` необходима чтобы "контейнерный" процесс (`bash`) унаследовал пространства имён <br> • опция `--mount-proc` необходима чтобы смонтировать отдельный `/proc`, иначе `ps` внутри контейнера продолжит видеть внешние процессы по старому `/proc` |
-| **mount** | `unshare --mount --fork bash`   | `findmnt -T /mnt` | • `mount -t tmpfs tmpfs /mnt` <br> • `findmnt -T /mnt` | <img src="./scrs/part2_02.png" width=100> | • файловая система, смонтированная внутри контейнера, не видна на хосте |
-| **net**   | `unshare --net --fork bash` | `nsenter -t <host-pid> --net -- ip link` | `ip link` |  | • внутри создаётся отдельный сетевой стек; интерфейсы хоста не видны, обычно остаётся только `lo` |
-| **uts**   | `unshare --uts --fork bash` | `hostname` | `hostname isolated-demo` <br> `hostname` |  | • изменение hostname внутри контейнера не изменяет hostname хоста |
-| **ipc**   | `unshare --ipc --fork bash` | `ipcs -q` | `ipcmk -Q` <br> `ipcs -q` <br> `ipcrm -q <queue-id>` |  | • очереди сообщений, семафоры и разделяемая память System V изолированы от хоста |
-| **user**[^userns]  | `unshare --user --map-root-user --fork bash` | `id` <br> `ps -o pid,user,uid,cmd -p <host-pid>` | `id` <br> `cat /proc/self/uid_map` |  | • root внутри контейнера отображается как непривилегированный пользователь хоста |
+| **pid**   | `sudo unshare --pid --fork --mount-proc bash`  | `nsenter -t $(pgrep -xn bash) --pid --mount -- ps -ef` | `ps -ef` | <img src="./scrs/part2_pid-1.png" width=100 /> <img src="./scrs/part2_pid-2.png" width=100> <img src="./scrs/part2_pid-3.png" width=100> | • опция `--fork` необходима чтобы "контейнерный" процесс (`bash`) унаследовал пространства имён <br> • опция `--mount-proc` необходима чтобы смонтировать отдельный `/proc`, иначе `ps` внутри контейнера продолжит видеть внешние процессы по старому `/proc` |
+| **mount** | `sudo unshare --mount --fork bash`   | `findmnt -T /mnt` | • `mount -t tmpfs tmpfs /mnt` <br> • `findmnt -T /mnt` | <img src="./scrs/part2_mnt.png" width=100> | • файловая система, смонтированная внутри контейнера, не видна на хосте |
+| **net**   | `sudo unshare --net --fork bash` | `nsenter -t <host-pid> --net -- ip link` | `ip link` | <img src="./scrs/part2_net.png" width=100> | • внутри создаётся отдельный сетевой стек; интерфейсы хоста не видны, остаётся только `lo` |
+| **uts**   | `sudo unshare --uts --fork bash` | `hostname` | `hostname isolated-demo` <br> `hostname` | <img src="./scrs/part2_uts.png" width=100> | • изменение hostname внутри контейнера не изменяет hostname хоста |
+| **ipc**   | `sudo unshare --ipc --fork bash` | `ipcs -q` | `ipcmk -Q` <br> `ipcs -q` <br> `ipcrm -q <queue-id>` | <img src="./scrs/part2_ipc.png" width=100> | • очереди сообщений, семафоры и разделяемая память System V изолированы от хоста |
+| **user**[^userns]  | `unshare --user --map-root-user --fork bash` | `id` <br> `ps -o pid,user,uid,cmd -p <host-pid>` | `id` <br> `cat /proc/self/uid_map` | <img src="./scrs/part2_user.png" width=100> <img src="./scrs/part2_user-root.png" width=100> | • root внтри контейнера отображается как непривилегированный пользователь хоста <br> • `unshare --user` также изменяет маппинг родительского процесса внутри namespace, накладывая тем самым ограничения на использование пользователей хоста внутри пространства имён |
 
-[^userns]: [статья](https://habr.com/ru/articles/459574/) на Хабре про User namespace
+[^userns]: [статья](https://habr.com/ru/articles/459574/) на Хабре про `user` namespace
+
+#### Результат
+
+Объеденив все 6 пространств имён в одну команду, получаем:
+
+| Namespace | Инициализация | Результат |
+|:----------|:--------------|:----------|
+| **all**   | `unshare --pid --mount --net --uts --ipc --user --map-root-user --fork --mount-proc /tmp/api`  | <img src="./scrs/part2_all-1.png" width=100> <img src="./scrs/part2_all-2.png" width=100> |
 
 #### Инструменты
 
@@ -73,10 +81,5 @@ PID процесса 34774, общее потребление CPU под наг�
 | **ipcs**      | `ipcs -q` | показывает очереди сообщений System V в текущем IPC namespace |
 | **ipcmk**     | `ipcmk -Q` | создаёт очередь сообщений System V для проверки изоляции IPC |
 | **ipcrm**     | `ipcrm -q <queue-id>` | удаляет созданную очередь сообщений после проверки |
-| **id**        | `id` <br> `cat /proc/self/uid_map` | показывает UID/GID процесса и отображение пользователей в user namespace |
-
-#### Результат
-Объеденив все 6 пространств имён в одну команду, получаем:
-| Namespaces| Инициализация | Результат |
-|:----------|:--------------|:----------|
-| **all**   | `unshare --pid --mount --net --uts --ipc --user --map-root-user --fork --mount-proc /tmp/api`  | |
+| **id**        | `id` | показывает UID/GID процесса |
+| **uid_map**   | `cat /proc/<pid>/uid_map` | показывает маппинг пользователей в user namespace; возвращает разное значение в зависимости от того, какой процесс запрашивает |
