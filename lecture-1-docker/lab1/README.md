@@ -63,7 +63,9 @@ PID процесса 34774, общее потребление CPU под наг�
 
 | Namespace | Инициализация | Результат |
 |:----------|:--------------|:----------|
-| **all**   | `unshare --pid --mount --net --uts --ipc --user --map-root-user --fork --mount-proc /tmp/api`  | <img src="./scrs/part2_all-1.png" width=100> <img src="./scrs/part2_all-2.png" width=100> |
+| **all**[^lwn_ns]   | `unshare --pid --mount --net --uts --ipc --user --map-root-user --fork --mount-proc /tmp/api`  | <img src="./scrs/part2_all-1.png" width=100> <img src="./scrs/part2_all-2.png" width=100> |
+
+[^lwn_ns]: ещё одна [статья](https://lwn.net/Articles/531114/), подробно описывает все типы namespace'ов и историю их появления
 
 #### Инструменты
 
@@ -83,3 +85,12 @@ PID процесса 34774, общее потребление CPU под наг�
 | **ipcrm**     | `ipcrm -q <queue-id>` | удаляет созданную очередь сообщений после проверки |
 | **id**        | `id` | показывает UID/GID процесса |
 | **uid_map**   | `cat /proc/<pid>/uid_map` | показывает маппинг пользователей в user namespace; возвращает разное значение в зависимости от того, какой процесс запрашивает |
+
+
+### Part 3
+
+Провели эксперименты с назначением лимитов по памяти, CPU и количеству процессов посредством инструментов `cgroup`. Результат свели в таблицу:
+| Шаг       | Инициализация | Проверка | Результат | Примечания    |
+|:----------|:--------------|:---------|:----------|:--------------|
+| **Memory**| `/sys/fs/cgroup/<cg_name>/cgroup.procs` <br> `/sys/fs/cgroup/<cg_name>/memory.max` <br> `/sys/fs/cgroup/<cg_name>/memory.swap.max` | `/sys/fs/cgroup/<cg_name>/memory.events` | <img src="./scrs/part3_oom.png" width=100> | • важно установить лимит на `swap`, потому что если этот механизм будет задействован, процесс продолжит наращивать виртуальную память, и не перевалит за установленный `memory.max` лимит пока всё адресное пространство виртуальной памяти не будет исчерпано |
+
