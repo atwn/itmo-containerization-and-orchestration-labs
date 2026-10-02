@@ -63,7 +63,9 @@ PID процесса 34774, общее потребление CPU под наг�
 
 | Namespace | Инициализация | Результат |
 |:----------|:--------------|:----------|
-| **all**   | `unshare --pid --mount --net --uts --ipc --user --map-root-user --fork --mount-proc /tmp/api`  | <img src="./scrs/part2_all-1.png" width=100> <img src="./scrs/part2_all-2.png" width=100> |
+| **all**[^lwn_ns]   | `unshare --pid --mount --net --uts --ipc --user --map-root-user --fork --mount-proc /tmp/api`  | <img src="./scrs/part2_all-1.png" width=100> <img src="./scrs/part2_all-2.png" width=100> |
+
+[^lwn_ns]: ещё одна [статья](https://lwn.net/Articles/531114/), подробно описывает все типы namespace'ов и историю их появления
 
 #### Инструменты
 
@@ -83,3 +85,22 @@ PID процесса 34774, общее потребление CPU под наг�
 | **ipcrm**     | `ipcrm -q <queue-id>` | удаляет созданную очередь сообщений после проверки |
 | **id**        | `id` | показывает UID/GID процесса |
 | **uid_map**   | `cat /proc/<pid>/uid_map` | показывает маппинг пользователей в user namespace; возвращает разное значение в зависимости от того, какой процесс запрашивает |
+
+
+### Part 3
+
+Провели эксперименты с назначением лимитов по памяти, CPU и количеству процессов посредством инструментов `cgroup`. Результаты свели в таблицу:
+
+| Шаг           | Инициализация | Проверка | Результат | Примечания    |
+|:--------------|:--------------|:---------|:----------|:--------------|
+| **Memory**    | `/sys/fs/cgroup/<cg_name>/cgroup.procs` <br> `/sys/fs/cgroup/<cg_name>/memory.max` <br> `/sys/fs/cgroup/<cg_name>/memory.swap.max` | `/sys/fs/cgroup/<cg_name>/memory.events` <br> └─`oom` <br> └─`oom_killed` | <img src="./scrs/part3-oom.png" width=100> | • важно установить лимит на `swap`, потому что если этот механизм будет задействован, процесс продолжит наращивать виртуальную память, и не перевалит за установленный `memory.max` лимит пока всё адресное пространство виртуальной памяти не будет исчерпано |
+| **CPU**       | `/sys/fs/cgroup/<cg_name>/cgroup.procs` <br> `/sys/fs/cgroup/<cg_name>/cpu.max` | `/sys/fs/cgroup/<cg_name>/cpu.stat` <br> └─`nr_throttled` <br> └─`throttled_usec` | <img src="./scrs/part3-cpu.png" width=100> | • лимит по CPU устанавливается при помощи двух чисел: <количество доступных мс за интервал> <длина интервала в мс> <br> • причём, первое число может превышать длину интервала, что означает разрешение использовать нескольких ядер CPU данной группе |
+| **PIDs**  | `/sys/fs/cgroup/<cg_name>/cgroup.procs` <br> `/sys/fs/cgroup/<cg_name>/pids.max` | `/sys/fs/cgroup/<cg_name>/pids.current` <br> `/sys/fs/cgroup/<cg_name>/pids.events` | <img src="./scrs/part3-pids.png" width=100> | • под "процессами" (pids) здесь, на самом деле понимается количество потоков (Tasks), а не процессов (Proc)  |
+
+#### Инструменты
+
+| Название          | Использование | Назначение |
+|:------------------|:--------------|:-----------|
+| **top**           | `top -b -n 1 -p <pid> \| tail -n 2`   | показывает актуальную загрузку CPU процессом "в моменте" |
+| **systemd-cgtop** | `systemd-cgtop -b -n 1 <cgroup-name>` | показывает использование ресурсов группами процессов |
+| **stress-ng**     | `stress-ng --fork 50 --timeout 10s`   | поддерживает заданное число запущенных одновременно процессов (использует системный вызов fork(), который возвращает EAGAIN когда упирается в лимит pids.max) |
