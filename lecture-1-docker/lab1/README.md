@@ -104,3 +104,23 @@ PID процесса 34774, общее потребление CPU под наг�
 | **top**           | `top -b -n 1 -p <pid> \| tail -n 2`   | показывает актуальную загрузку CPU процессом "в моменте" |
 | **systemd-cgtop** | `systemd-cgtop -b -n 1 <cgroup-name>` | показывает использование ресурсов группами процессов |
 | **stress-ng**     | `stress-ng --fork 50 --timeout 10s`   | поддерживает заданное число запущенных одновременно процессов (использует системный вызов fork(), который возвращает EAGAIN когда упирается в лимит pids.max) |
+
+### Part 4
+
+Рассмотрели два механизма ядра Linux, используемые для разграничения доступа.
+
+| Шаг               | Инициализация | Проверка | Демонстрация   | Примечания    |
+|:------------------|:--------------|:---------|:---------------|:--------------|
+| **capabilities**[^cap]  | `capsh --drop=<capability-name> -c <unprivileged-command>` | `grep -E "^(Cap\|NoNewPrivs):" /proc/$$/status` <br> └─`CapEff` - применяются сейчас <br> └─`CapPrm` - потенциально допустимые <br> └─`CapBnd` - доступные дочернему процессу <br> `capsh --print` | <img src="./scrs/part4-cap.png" width=100> | • библиотека **libcap** (`apt-cache show libcap2-bin`) <br> • ограничения задаются при инициализации дочернего процесса, путём *исключения* `capabilities` из списка эффективных возможностей родительского процесса |
+| **seccomp**       | `sudo systemd-run --wait --pipe --collect --property='SystemCallFilter=~mkdir mkdirat' --property=SystemCallErrorNumber=EPERM /usr/bin/strace -f -e trace=mkdir,mkdirat /usr/bin/mkdir /tmp/seccomp-demo` | `strace -f -e trace=mkdir,mkdirat` <br> └─ ожидается `mkdirat(...) = -1 EPERM` | <img src="./scrs/part4-seccomp.png" width=100> | • библиотека **libseccomp** (`apt-cache show libseccomp-dev`) <br> • применяется для фильтрации системных вызовов <br> • для демонстрации выбраны `mkdir`/`mkdirat`, а не `uname`: `strace` сам вызывает `uname` при запуске, поэтому фильтрация `uname` не позволяла трассировщику стартовать и скрывала результат фильтра |
+
+[^cap]: [статья](https://habr.com/ru/articles/1075296/) на Хабре про `capabilities`
+
+#### Инструменты
+
+| Название                  | Использование | Назначение |
+|:--------------------------|:--------------|:-----------|
+| **capsh**                 | `capsh --drop=<capability-name> -c <unprivileged-command>` | позволяет запустить процесс с заданными `capapbilities`-ограничениями |
+| **systemd-run**           | `systemd-run --wait --pipe --collect <program>`   | запускает программу в ограниченном контексте (**transient scope**) или сервисе (**transient service**), с возможностью выставить cgroup'ы и seccomp-фильтры |
+| **strace**                | `strace -f -e trace=<syscall-name> <program>` | позволяет отслеживать системные вызовы произвольной программы без необходимости доступа к её исходному коду |
+
