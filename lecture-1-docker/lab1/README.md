@@ -185,3 +185,15 @@ Docker автоматизирует их настройку и дополнит�
 | **systemd-run** | `systemd-run --unit=lab1-api --collect --no-block <program>` | • создаёт transient service и запускает программу в отдельном cgroup<br>• через параметры unit позволяет задать лимиты ресурсов, `NoNewPrivileges` и seccomp-фильтры |
 | **systemctl** | `systemctl status lab1-api` <br> `systemctl stop lab1-api` | • показывает параметры и состояние transient service<br>• управляет его жизненным циклом |
 
+### Part 6
+
+Собрали multi-stage Dockerfile (см. [./src/api/Dockerfile](./src/api/Dockerfile)) для docker на основе `scratch`.
+Изучили механизм переиспользования слоёв и сравнили структуру multi-stage образа с его single-stage аналогом.
+Также провели исследование namespaces, cgroups и capabilities процесса, запущенного в docker-контейнере.
+В завершение, поэкспериментировали с эфемерной файловой системой контейнера и подключили volume.
+Выводы представлены ниже в таблице.
+
+| Шаг | Инициализация | Проверка | Демонстрация | Наблюдения |
+|:----|:--------------|:---------|:-------------|:-----------|
+| **1. Кэширование слоёв, размер образа** | `docker build -t lab1-api:multi ./src/api` | `docker image inspect lab1-api:multi --format '{{.Size}} bytes'`<br>`docker history lab1-api:multi` | <img src="./scrs/part6-01-1.png" width=100> <img src="./scrs/part6-01-2.png" width=100> | • builder-слои переиспользуются при повторной сборке (`CACHED`)<br>• `go mod download` находится в отдельном cacheable layer<br>• в итоговый образ попадает только бинарный файл и metadata runtime-слоёв, а Go toolchain отбрасывается |
+| **2. Сравнение multi-stage с single-stage** | `docker build -f ./src/api/Dockerfile.single -t lab1-api:single ./src/api` | `docker image inspect lab1-api:single lab1-api:multi --format '{{.RepoTags}}: {{.Size}} bytes'`<br>`docker history lab1-api:single`<br>`docker history lab1-api:multi` | <img src="./scrs/part6-02.png" width=100> | • multi-stage образ существенно меньше, потому что не содержит Go toolchain и build environment<br>• single-stage образ содержит инструменты, библиотеки и файлы, нужные только для сборки<br>• multi-stage уменьшает runtime attack surface и объём передаваемых данных |
