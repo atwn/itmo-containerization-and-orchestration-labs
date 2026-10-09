@@ -124,3 +124,64 @@ PID процесса 34774, общее потребление CPU под наг�
 | **systemd-run**           | `systemd-run --wait --pipe --collect <program>`   | запускает программу в ограниченном контексте (**transient scope**) или сервисе (**transient service**), с возможностью выставить cgroup'ы и seccomp-фильтры |
 | **strace**                | `strace -f -e trace=<syscall-name> <program>` | позволяет отслеживать системные вызовы произвольной программы без необходимости доступа к её исходному коду |
 
+### Part 5
+
+Собрали запуск сервиса из механизмов, проверенных в предыдущих частях: namespaces, cgroups и ограничения привилегий.
+
+Для управления cgroup создаём transient service при помощи `systemd-run`, а namespaces создаём при помощи `unshare`.
+
+Параметры `systemd-run` соответствуют контроллерам cgroup v2, рассмотренным в [Part 4](#part-4).
+
+| Limit         | Параметр systemd  | Файл cgroup v2 |
+|:--------------|:------------------|:---------------|
+| Память        | `MemoryMax=128M`  | `memory.max`   |
+| Swap          | `MemorySwapMax=0` | `memory.swap.max` |
+| CPU           | `CPUQuota=50%` | `cpu.max` |
+| Количество tasks | `TasksMax=64` | `pids.max` |
+
+Поскольку API находится в отдельном network namespace, запрос выполняли из внешнего процесса, вошедшего только в его network namespace.
+`curl` остаётся обычным host-процессом, но использует сетевой стек API. Поэтому для проверки не требовались `veth`, bridge и маршрутизация.
+
+| Шаг | Запуск | Проверка | Демонстрация | Наблюдения |
+|:----|:-------|:---------|:-------------|:-----------|
+| **1. `systemd-run` <br>+ `unshare`** | `./scripts/mydocker.sh start`<br><br>Внутри скрипта: `systemd-run` запускает `unshare` с PID, mount, network, UTS, IPC и user namespaces | `systemctl show lab1-api`<br>`lsns -p <api-pid>`<br>`nsenter -t <api-pid> --net -- curl http://localhost:8080/health` | <img src="./scrs/part5-01.png" width=100> | • cgroup transient service наследуется `unshare` и `/tmp/api`<br>• host-side `localhost` не видит сервис в отдельном network namespace |
+| **2. + `capabilities`** | systemd-run задаёт `NoNewPrivileges=yes`, после чего внутри user namespace выполняется `capsh --drop=cap_sys_time` перед `exec /tmp/api` | `grep -E "^(Cap\|NoNewPrivs):" /proc/<api-pid>/status`<br>`CapPrm`, `CapEff`, `CapBnd` | <img src="./scrs/part5-02-1.png" width=100> <img src="./scrs/part5-02-2.png" width=100> | • ограничение capabilities до создания user namespace не дало ожидаемого результата для `/tmp/api`<br>• новый user namespace получил собственный набор capabilities<br>• drop выполняется внутри user namespace |
+| **3. + `seccomp`** | systemd-run с `SystemCallFilter=~mkdir mkdirat` и `SystemCallErrorNumber=EPERM` | `strace -f -e trace=mkdir,mkdirat`<br>ожидается `mkdirat(...) = -1 EPERM` | <img src="./scrs/part5-03.png" width=100> | • seccomp фильтрует системные вызовы<br>• `mkdir` выбран вместо `uname`, потому что `strace` сам использует `uname` при запуске |
+
+Вышеописанные шаги и команды сведены в единый [скрипт](./scripts/mydocker.sh), имитирующий поведение `docker run`. Для запуска, выполните (необходимы права sudo на хосте и скомпилированное приложение):
+
+```bash
+./scripts/mydocker.sh start
+./scripts/mydocker.sh status
+./scripts/mydocker.sh stop
+```
+
+#### Выводы:
+
+- использование `systemd-run` позволило нам более эффективно управлять cgroup и жизненным циклом просесса
+- сначала создаётся transient service с cgroup-лимитами, а затем внутри него запускаются namespaces: дочерние процессы автоматически наследуют cgroup, тогда как root внутри user namespace обычно не может управлять cgroup хоста;
+- ограничение capabilities, заданное до создания `user` namespace, не гарантирует тот же набор ограничений для процесса внутри namespace: после создания user namespace процесс получает capabilities в своём namespace. Поэтому `capsh --drop=cap_sys_time` нужно выполнять внутри user namespace, перед `exec /tmp/api`;
+- `MemorySwapMax=0` исключает уход памяти в swap во время эксперимента;
+- host-side `curl localhost:8080` не видит API в отдельном network namespace; для проверки используется `nsenter --net`.
+
+#### Сравнение с `docker run`
+
+Запуск через `systemd-run` + `unshare` показывает базовые механизмы контейнера непосредственно на уровне ядра.
+Docker автоматизирует их настройку и дополнительно предоставляет:
+
+- готовую файловую систему контейнера из image;
+- управление жизненным циклом и именами контейнеров;
+- сетевое подключение через `veth` и bridge;
+- готовые профили capabilities и seccomp;
+- более удобную настройку volumes, портов, логирования и restart policy.
+
+Текущая реализация использует host filesystem и требует ручной настройки namespace и проверки сетевого namespace;
+это основные отличия от полноценного `docker run`.
+
+#### Инструменты
+
+| Название | Использование | Назначение |
+|:---------|:--------------|:-----------|
+| **systemd-run** | `systemd-run --unit=lab1-api --collect --no-block <program>` | • создаёт transient service и запускает программу в отдельном cgroup<br>• через параметры unit позволяет задать лимиты ресурсов, `NoNewPrivileges` и seccomp-фильтры |
+| **systemctl** | `systemctl status lab1-api` <br> `systemctl stop lab1-api` | • показывает параметры и состояние transient service<br>• управляет его жизненным циклом |
+
