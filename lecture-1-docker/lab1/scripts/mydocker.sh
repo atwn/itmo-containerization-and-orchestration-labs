@@ -46,7 +46,6 @@ start() {
         -p MemorySwapMax=0 \
         -p CPUQuota=50% \
         -p TasksMax=64 \
-        -p 'CapabilityBoundingSet=~CAP_SYS_TIME' \
         -p NoNewPrivileges=yes \
         -p 'SystemCallFilter=~mkdir mkdirat' \
         -p SystemCallErrorNumber=EPERM \
@@ -57,7 +56,7 @@ start() {
             --fork --mount-proc \
             bash -c '
                 ip link set lo up
-                exec "$1"
+                exec capsh --drop=cap_sys_time -- -c "exec \"$1\""
             ' bash "$API_BIN"
 
     echo "started transient service: $UNIT_NAME"
