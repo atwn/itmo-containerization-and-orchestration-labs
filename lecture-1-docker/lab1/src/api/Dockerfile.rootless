@@ -1,0 +1,24 @@
+FROM golang:1.27.1 AS build
+
+WORKDIR /src
+
+COPY go.mod ./
+RUN go mod download
+COPY . ./
+
+RUN CGO_ENABLED=0 GOOS=linux \
+    go build -trimpath -ldflags="-s -w" -o /out/api .
+
+RUN mkdir -p /out/data && chown 65532:65532 /out/data
+
+FROM scratch
+
+COPY --from=build /out/api /api
+COPY --from=build --chown=65532:65532 /out/data /data
+
+# Numeric IDs work in scratch without /etc/passwd or /etc/group.
+USER 65532:65532
+
+EXPOSE 8080
+
+ENTRYPOINT ["/api"]

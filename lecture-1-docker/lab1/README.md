@@ -197,3 +197,38 @@ Docker автоматизирует их настройку и дополнит�
 |:----|:--------------|:---------|:-------------|:-----------|
 | **1. Кэширование слоёв, размер образа** | `docker build -t lab1-api:multi ./src/api` | `docker image inspect lab1-api:multi --format '{{.Size}} bytes'`<br>`docker history lab1-api:multi` | <img src="./scrs/part6-01-1.png" width=100> <img src="./scrs/part6-01-2.png" width=100> | • builder-слои переиспользуются при повторной сборке (`CACHED`)<br>• `go mod download` находится в отдельном cacheable layer<br>• в итоговый образ попадает только бинарный файл и metadata runtime-слоёв, а Go toolchain отбрасывается |
 | **2. Сравнение multi-stage с single-stage** | `docker build -f ./src/api/Dockerfile.single -t lab1-api:single ./src/api` | `docker image inspect lab1-api:single lab1-api:multi --format '{{.RepoTags}}: {{.Size}} bytes'`<br>`docker history lab1-api:single`<br>`docker history lab1-api:multi` | <img src="./scrs/part6-02.png" width=100> | • multi-stage образ существенно меньше, потому что не содержит Go toolchain и build environment<br>• single-stage образ содержит инструменты, библиотеки и файлы, нужные только для сборки<br>• multi-stage уменьшает runtime attack surface и объём передаваемых данных |
+| **3. Проверка лимитов и security** | `docker run -d --name lab1-inspect --memory=128m --memory-swap=128m --cpus=0.5 --pids-limit=64 --cap-drop=ALL --security-opt=no-new-privileges:true lab1-api:multi` | `docker inspect lab1-inspect`<br>`cat /proc/<pid>/status`<br>проверка `Cap*`, `NoNewPrivs` и cgroup limits | <img src="./scrs/part6-03-1.png" width=100> <img src="./scrs/part6-03-2.png" width=100> | • Docker применяет ограничения по памяти, swap, CPU и количеству tasks<br>• `--cap-drop=ALL` удаляет capabilities из контейнера<br>• `no-new-privileges` запрещает получение новых привилегий через `execve`<br>• security-настройки контейнера видны через `docker inspect` и `/proc/<pid>/status` |
+| **4. Проверка namespaces и user identity** | `PID=$(docker inspect -f '{{.State.Pid}}' lab1-inspect)`<br>`sudo lsns -p "$PID"` | `cat /proc/$PID/uid_map`<br>`sudo lsns -p "$PID"` | <img src="./scrs/part6-04-1.png" width=100> <img src="./scrs/part6-04-2.png" width=100> | • контейнер использует отдельные PID, mount, network, UTS, IPC и cgroup namespaces<br>• user namespace совпадает с user namespace host PID 1<br>• без `userns-remap` UID 0 внутри контейнера отображается как root на host<br>• `cap-drop=ALL` уменьшает права root, но не меняет отображение UID<br>• `Dockerfile.rootless` запускает приложение от UID `65532`, но сам по себе не создаёт user namespace<br>• реальное отображение UID появляется только при rootless Docker или включённом `userns-remap` |
+| **5. Volumes** | `docker volume create lab1-data`<br>`docker run --mount source=lab1-data,target=/data ...`<br>настроить ownership и permissions `/data` для UID `65532` | записать `/data/marker`<br>удалить контейнер<br>создать новый контейнер с тем же volume и прочитать файл | <img src="./scrs/part6-05-1.png" width=100> <img src="./scrs/part6-05-2.png" width=100> | • named volume имеет lifecycle, независимый от контейнера<br>• файл сохраняется после удаления и пересоздания контейнера<br>• для непривилегированного UID нужно заранее настроить ownership или permissions точки монтирования<br>• volume хранит данные отдельно от ephemeral writable layer контейнера |
+
+#### Rootless Docker и UID mapping
+
+Для отдельного эксперимента подготовлен [Dockerfile.rootless](./src/api/Dockerfile.rootless).
+Он запускает `/api` от числового UID `65532`, поскольку в `scratch` нет `/etc/passwd`.
+Сам Dockerfile не создаёт user namespace: mapping задаётся rootless Docker daemon или daemon с включённым `userns-remap`.
+
+Сборка и запуск:
+
+```bash
+docker build -f ./src/api/Dockerfile.rootless \
+  -t lab1-api:rootless ./src/api
+
+docker run -d \
+  --name lab1-rootless \
+  --publish 18080:8080 \
+  lab1-api:rootless
+```
+
+Если Docker daemon rootless или использует `userns-remap`, UID `0` внутри этого контейнера будет отображаться на непривилегированный UID хоста.
+В противном случае, необходимо самим менять UID пользователя в Dockerfile для минимизации рисков privilege escalation.
+
+#### Инструменты
+
+| Название                  | Использование | Назначение |
+|:--------------------------|:--------------|:-----------|
+| **docker build** | `docker build --progress=plain -t lab1-api:multi ./src/api` | собирает image по Dockerfile; подробный вывод позволяет увидеть использование build cache |
+| **docker image inspect** | `docker image inspect lab1-api:multi --format '{{.Size}} bytes'` | показывает metadata image, включая его размер |
+| **docker history** | `docker history lab1-api:multi` | показывает слои итогового image и команды, которыми они были созданы |
+| **docker run** | `docker run -d --name lab1-inspect --memory=128m --cpus=0.5 --pids-limit=64 ...` | создаёт и запускает контейнер с заданными resource limits и security options |
+| **docker inspect** | `docker inspect lab1-inspect`<br>`docker inspect -f '{{.State.Pid}}' lab1-inspect` | показывает конфигурацию и состояние контейнера; через `State.Pid` позволяет найти host PID процесса для проверки `/proc`, namespaces и cgroup |
+| **busybox** | `docker run --network container:<target> --pid container:<target> busybox:1.36.1 sh -c '...'` | минимальный helper image с shell и файловыми утилитами для проверки writable layer и сохранения данных в volume |
