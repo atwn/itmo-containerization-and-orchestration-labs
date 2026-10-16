@@ -1,0 +1,7 @@
+00:25:56 pod=shop-batch-5cfb956788-qmx8x restarts=0
+00:26:05 pod=shop-batch-5cfb956788-qmx8x restarts=0
+00:26:14 pod=shop-batch-5cfb956788-qmx8x restarts=0
+00:26:23 pod=shop-batch-5cfb956788-qmx8x restarts=0
+00:26:32 pod=shop-batch-5cfb956788-qmx8x restarts=0
+00:26:40 pod=shop-batch-5cfb956788-qmx8x restarts=1
+RESTART DETECTED

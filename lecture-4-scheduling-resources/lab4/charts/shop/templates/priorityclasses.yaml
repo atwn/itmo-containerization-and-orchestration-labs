@@ -1,0 +1,23 @@
+{{- if .Values.priorityClasses.enabled }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ .Values.priorityClasses.critical.name }}
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+value: {{ .Values.priorityClasses.critical.value | int }}
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Critical path of shop (api, postgres): scheduled first, preempts batch, never the preemption target."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ .Values.priorityClasses.batch.name }}
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+value: {{ .Values.priorityClasses.batch.value | int }}
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Sacrificial background batch (nightly analytics): below the cluster default priority (0), first to be preempted or evicted under pressure."
+{{- end }}

@@ -1,0 +1,59 @@
+Part 3 — real usage behind the krr/manual recommendations.
+
+=== k6 run #1 (baseline guess, 15 VUs, 3m, via `kubectl port-forward svc/shop-api`) ===
+checks_succeeded: 100.00% (5482/5482), http_req_failed: 0.00%
+http_req_duration: avg=394.27ms min=5.78ms med=203.67ms max=2.69s p(90)=1.01s p(95)=1.28s
+THRESHOLD 'p(95)<300' FAILED (p95=1.28s)
+
+Root cause found via Prometheus (not guessed): `kubectl port-forward svc/...` pins to ONE
+backend pod for the life of the connection. Prometheus confirmed only ONE of three api pods
+(shop-api-...-k9h52) carried real traffic during the run:
+  api pod k9h52 (worker2): p95 cpu usage ≈ 0.2486 cores   <- saturated at the 250m limit
+  api pod bfwm7 (worker):  p95 cpu usage ≈ 0.0011 cores   <- idle, never got traffic
+  api pod 5zvbf (worker):  p95 cpu usage ≈ 0.0012 cores   <- idle, never got traffic
+This explains the 1.28s p95: one replica throttled at its CPU limit while two sat idle, not a
+real capacity problem with api as deployed. Switched all later load generation to an in-cluster
+k6 Job hitting the ClusterIP by DNS (scripts/load-job.yaml), which lets kube-proxy actually
+load-balance across all three pods.
+
+=== k6 run #2 (in-cluster Job, 15 VUs, 3m, after the port-forward fix) ===
+checks_succeeded: 100.00% (5768/5768), http_req_failed: 0.00%
+http_req_duration: avg=366.89ms p(90)=896.05ms p(95)=1.07s
+
+Still above the 300ms SLA target even with proper load balancing — this time for a real reason:
+all 3 api pods now show ~249-250m CPU (saturated at their original 250m limit), confirmed via:
+  quantile_over_time(0.95, rate(container_cpu_usage_seconds_total{container="api"}[1m])[3m30s:15s])
+  -> shop-api-bfwm7: 0.2491   shop-api-k9h52: 0.2492   shop-api-5zvbf: 0.2496
+All three replicas genuinely needed more than 250m CPU under this load — a real, not artifact,
+capacity gap. This is the number used to size the Guaranteed CPU request in Part 5 (with headroom
+added, since a pod already throttled at its limit cannot reveal demand above that limit).
+
+=== Measured resource usage during that same load window (used for Part 3/5 sizing) ===
+api (per pod, p95 cpu / max memory):
+  cpu  ≈ 0.249 cores (saturated at old 250m limit; true demand is >= this)
+  memory ≈ 27-68 MB across the 3 pods (max 67.85MB on the busiest replica)
+postgres (shop-postgres-1):
+  cpu  ≈ 0.266 cores (not against any limit at the time — real, unconstrained demand)
+  memory ≈ 101.6 MB
+worker (per pod):
+  cpu  ≈ 0.006-0.015 cores
+  memory ≈ 20-25 MB
+batch (per pod, cpuWorkers busy-loop, for reference — not sized by krr/PromQL, deliberately
+burns up to its configured limit):
+  cpu ≈ 1.497 of its 1.5 limit (by design)
+  memory ≈ 5-6 MB with MEMORY_MB=0
+
+=== krr (robustadev/krr:v1.30.0, strategy=simple, history_duration=1h, timeframe_duration=0.25m) ===
+See krr/krr-report.json for the full machine output. Summary:
+  shop-api:    requests cpu=0.01 (floor, "GOOD"), memory=104857600 ("GOOD"); limits cpu=unset
+  shop-worker: requests cpu=0.01 (floor, "GOOD"), memory=104857600 ("GOOD"); limits cpu=unset
+  shop-batch:  "Not enough data" for both resources (expected — not krr's job, see README)
+  (no entry for postgres at all — krr's discovery only walks Deployment/StatefulSet/DaemonSet/
+  Job-owned pods; CloudNativePG's Cluster controller owns the postgres Pod directly, so krr
+  never sees it)
+
+krr's own api number (10m, the configured floor) is an artifact of the *first*, port-forward-
+skewed load run diluting the 95th percentile over a mostly-idle hour (only ~3 of ~60 minutes of
+history had any real traffic, and that traffic hit only one of three pods) — not a disagreement
+with the PromQL measurement above, which is scoped exactly to the load window and to the
+properly load-balanced run. The PromQL numbers are what actually went into values.yaml.

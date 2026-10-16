@@ -1,0 +1,120 @@
+=== 18:17:46 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    14.45%    1.17GiB / 3GiB      39.02%    587MB / 8.54MB   0B / 0B     364
+6c1b28a2672b   shop4-worker2   38.22%    1.08GiB / 3GiB      36.01%    598MB / 26.8MB   0B / 0B     415
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:18:00 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    39.62%    1.329GiB / 3GiB     44.29%    588MB / 8.59MB   0B / 0B     364
+6c1b28a2672b   shop4-worker2   7.61%     1.24GiB / 3GiB      41.32%    598MB / 27.3MB   0B / 0B     418
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:18:14 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    29.60%    1.403GiB / 3GiB     46.78%    589MB / 8.65MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   10.93%    1.316GiB / 3GiB     43.88%    598MB / 27.8MB   0B / 0B     418
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:18:27 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    14.48%    1.563GiB / 3GiB     52.09%    590MB / 8.69MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   6.83%     1.475GiB / 3GiB     49.18%    599MB / 28.3MB   0B / 0B     418
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:18:40 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    17.27%    1.714GiB / 3GiB     57.14%    590MB / 8.74MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   7.29%     1.632GiB / 3GiB     54.41%    599MB / 28.5MB   0B / 0B     418
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:18:53 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    12.31%    1.794GiB / 3GiB     59.81%    591MB / 8.79MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   8.81%     1.712GiB / 3GiB     57.06%    599MB / 28.9MB   0B / 0B     418
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:19:07 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    10.40%    1.952GiB / 3GiB     65.07%    592MB / 8.84MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   8.48%     1.868GiB / 3GiB     62.26%    599MB / 29.4MB   0B / 0B     418
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:19:21 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    21.09%    2.115GiB / 3GiB     70.51%    593MB / 8.9MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   18.64%    2.025GiB / 3GiB     67.51%    600MB / 30MB    0B / 0B     418
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:19:34 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    22.89%    2.195GiB / 3GiB     73.17%    594MB / 8.94MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   20.20%    2.184GiB / 3GiB     72.81%    600MB / 30.5MB   0B / 0B     418
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:19:48 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    13.59%    2.353GiB / 3GiB     78.42%    594MB / 8.99MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   15.46%    2.262GiB / 3GiB     75.41%    600MB / 31MB     0B / 0B     418
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:20:02 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    29.16%    2.511GiB / 3GiB     83.70%    595MB / 9.04MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   11.45%    2.419GiB / 3GiB     80.64%    600MB / 31.5MB   0B / 0B     419
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:20:15 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    13.56%    2.667GiB / 3GiB     88.91%    596MB / 9.09MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   11.83%    2.577GiB / 3GiB     85.91%    600MB / 32MB     0B / 0B     419
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:20:29 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    18.43%    2.701GiB / 3GiB     90.02%    597MB / 9.15MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   8.93%     2.652GiB / 3GiB     88.41%    600MB / 32.5MB   0B / 0B     419
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:20:43 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    8.87%     2.788GiB / 3GiB     92.94%    598MB / 9.2MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   7.61%     2.735GiB / 3GiB     91.16%    600MB / 33MB    0B / 0B     419
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:20:56 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    9.09%     2.858GiB / 3GiB     95.26%    599MB / 9.25MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   21.87%    2.811GiB / 3GiB     93.71%    601MB / 33.5MB   0B / 0B     419
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:21:09 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    20.98%    2.855GiB / 3GiB     95.16%    599MB / 9.3MB    0B / 0B     365
+6c1b28a2672b   shop4-worker2   7.58%     2.85GiB / 3GiB      95.00%    601MB / 33.6MB   0B / 0B     419
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:21:23 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    10.93%    2.859GiB / 3GiB     95.30%    600MB / 9.35MB   0B / 0B     365
+6c1b28a2672b   shop4-worker2   14.27%    2.849GiB / 3GiB     94.97%    601MB / 34.1MB   0B / 0B     419
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:21:35 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    21.67%    2.861GiB / 3GiB     95.38%    601MB / 9.4MB    0B / 0B     366
+6c1b28a2672b   shop4-worker2   6.20%     2.85GiB / 3GiB      95.02%    601MB / 34.6MB   0B / 0B     419
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:21:49 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    22.31%    2.864GiB / 3GiB     95.45%    602MB / 9.46MB   0B / 0B     366
+6c1b28a2672b   shop4-worker2   11.61%    2.849GiB / 3GiB     94.96%    601MB / 35.1MB   0B / 0B     419
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0
+=== 18:22:03 ===
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O   PIDS
+56cc44905c0a   shop4-worker    6.57%     2.862GiB / 3GiB     95.41%    602MB / 9.49MB   0B / 0B     366
+6c1b28a2672b   shop4-worker2   12.73%    2.85GiB / 3GiB      95.01%    601MB / 35.6MB   0B / 0B     419
+shop-batch-5cc46c5bd4-flbq7 restarts=0
+shop-batch-5cc46c5bd4-jffnw restarts=0

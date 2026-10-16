@@ -1,0 +1,190 @@
+nameOverride: ""
+fullnameOverride: ""
+
+databaseURL: postgres://shop:shop@shop-postgres-rw:5432/shop?sslmode=disable
+
+# Part 1: which mechanism spreads the critical `api` replicas across nodes.
+# One of: topologySpreadConstraints | podAntiAffinity. See README for why
+# topologySpreadConstraints was picked.
+spreading:
+  mechanism: topologySpreadConstraints
+
+priorityClasses:
+  enabled: true
+  critical:
+    name: shop-critical
+    value: 1000000
+  batch:
+    name: shop-batch
+    value: -1000
+
+api:
+  replicaCount: 3
+
+  image:
+    repository: lab4/api
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+
+  healthFail: false
+
+  probes:
+    liveness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    readiness:
+      initialDelaySeconds: 2
+      periodSeconds: 5
+
+  # Part 3/5: krr-informed numbers (see README for the measured p95/max and
+  # why we added headroom over the raw measurement), requests == limits for
+  # Guaranteed QoS.
+  resources:
+    requests:
+      cpu: 400m
+      memory: 100Mi
+    limits:
+      cpu: 400m
+      memory: 100Mi
+
+  # Part 5: Guaranteed QoS + high priority + PDB for the critical path.
+  priorityClassName: shop-critical
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+worker:
+  replicaCount: 2
+
+  image:
+    repository: lab4/worker
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+
+  pollInterval: 1s
+
+  probes:
+    liveness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    readiness:
+      initialDelaySeconds: 2
+      periodSeconds: 5
+
+  # worker is secondary background processing (per Lecture 4: "less critical,
+  # movable if needed") — it still gets krr-based numbers and a limit (the
+  # guardrail applies to every pod), but no priorityClass/PDB of its own.
+  # The original guess here was already close to measured usage (see README).
+  resources:
+    requests:
+      cpu: 25m
+      memory: 48Mi
+    limits:
+      cpu: 100m
+      memory: 96Mi
+
+# Part 0/2/6/7: batch stands in for nightly analytics — sacrificial, scaled
+# up to create scarcity (Part 6) and memory pressure (Part 7).
+batch:
+  # Steady-state default. Parts 6 and 7 raise replicaCount/memoryMB live via
+  # `helm upgrade --set ...` — see README for the exact commands and results;
+  # this file intentionally keeps the safe starting point.
+  replicaCount: 2
+
+  image:
+    repository: lab4/batch
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+  probes:
+    liveness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    readiness:
+      initialDelaySeconds: 2
+      periodSeconds: 5
+
+  # Burstable on purpose: requests below limits (Part 5). Still has limits —
+  # the Lab 3 guardrail applies to batch with no exceptions. The CPU request
+  # is deliberately large (relative to the ~12 CPU/node this kind cluster
+  # reports as Allocatable) so Part 6 reaches Pending/preemption at a modest
+  # replica count instead of needing dozens — see README.
+  resources:
+    requests:
+      cpu: "1500m"
+      memory: 128Mi
+    limits:
+      cpu: "1900m"
+      memory: 2Gi
+
+  # How hard batch burns resources, independent of the requests/limits above.
+  # cpuWorkers busy-loop goroutines; memoryMB is the real memory batch grows
+  # into and holds, in steps of memoryStepMB every memoryStepInterval.
+  cpuWorkers: 2
+  memoryMB: 0
+  memoryStepMB: 64
+  memoryStepInterval: 5s
+
+  priorityClassName: shop-batch
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+
+containerSecurityContext:
+  privileged: false
+  allowPrivilegeEscalation: false
+
+monitoring:
+  enabled: true
+  interval: 15s
+  scrapeTimeout: 5s
+  dashboard:
+    enabled: true
+  alerts:
+    errorRateThreshold: 0.05
+    errorRateFor: 2m
+    latencyP95Seconds: 1
+    latencyFor: 5m
+    pendingFor: 2m
+
+postgres:
+  instances: 1
+
+  storage:
+    size: 1Gi
+    storageClass: standard
+
+  database: shop
+  owner: shop
+
+  credentials:
+    username: shop
+    password: shop
+
+  # Part 3/5: krr can't discover a CNPG-managed Postgres pod (it isn't owned
+  # by a Deployment/StatefulSet — see README), so this is the same p95/max
+  # methodology applied directly via PromQL. requests == limits (Guaranteed).
+  resources:
+    requests:
+      cpu: 300m
+      memory: 140Mi
+    limits:
+      cpu: 300m
+      memory: 140Mi
+
+  priorityClassName: shop-critical
+  pdb:
+    enabled: true
+    minAvailable: 1

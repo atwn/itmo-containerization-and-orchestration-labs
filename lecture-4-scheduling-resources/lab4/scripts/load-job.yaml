@@ -1,0 +1,38 @@
+# Runs scripts/load.js as a one-off in-cluster Job, targeting the shop-api
+# ClusterIP by DNS name. Unlike `kubectl port-forward` (which pins to a single
+# backend pod for the life of the connection), traffic from inside the
+# cluster goes through the Service/EndpointSlice/kube-proxy path and is
+# actually balanced across all api replicas — see README, Part 3.
+#
+# The k6-load-script ConfigMap is (re)created separately before applying this
+# Job:
+#   kubectl -n shop4 create configmap k6-load-script --from-file=load.js=scripts/load.js --dry-run=client -o yaml | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-load
+  namespace: shop4
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          command: ["k6", "run", "/scripts/load.js"]
+          env:
+            - name: BASE_URL
+              value: http://shop-api
+            - name: VUS
+              value: "15"
+            - name: DURATION
+              value: "6m"
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+      volumes:
+        - name: script
+          configMap:
+            name: k6-load-script

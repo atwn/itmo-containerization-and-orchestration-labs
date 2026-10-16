@@ -1,0 +1,75 @@
+Name:                 shop-batch-5cb58d4c57-5rldf
+Namespace:            shop4
+Priority:             -1000
+Priority Class Name:  shop-batch
+Service Account:      default
+Node:                 shop4-worker2/172.20.0.2
+Start Time:           Sun, 11 Oct 2026 18:22:39 +0300
+Labels:               app.kubernetes.io/instance=shop
+                      app.kubernetes.io/managed-by=Helm
+                      app.kubernetes.io/name=batch
+                      app.kubernetes.io/part-of=shop
+                      helm.sh/chart=shop-0.2.0
+                      pod-template-hash=5cb58d4c57
+Annotations:          <none>
+Status:               Running
+IP:                   10.244.2.12
+IPs:
+  IP:           10.244.2.12
+Controlled By:  ReplicaSet/shop-batch-5cb58d4c57
+Containers:
+  batch:
+    Container ID:   containerd://3cfb30d135154c07080b76bf885fc9b919ad93ba38440f3450cf98f09781c422
+    Image:          lab4/batch:0.1.0
+    Image ID:       sha256:dd202e155e8073b40edf2664c3537fd2b8bdb2c28118325abd59240f6307834f
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Sun, 11 Oct 2026 18:26:09 +0300
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    137
+      Started:      Sun, 11 Oct 2026 18:22:41 +0300
+      Finished:     Sun, 11 Oct 2026 18:26:08 +0300
+    Ready:          True
+    Restart Count:  1
+    Limits:
+      cpu:     1900m
+      memory:  2Gi
+    Requests:
+      cpu:      1500m
+      memory:   128Mi
+    Liveness:   http-get http://:http/health delay=5s timeout=1s period=10s #success=1 #failure=3
+    Readiness:  http-get http://:http/health delay=2s timeout=1s period=5s #success=1 #failure=3
+    Environment:
+      CPU_WORKERS:           0
+      MEMORY_MB:             2300
+      MEMORY_STEP_MB:        80
+      MEMORY_STEP_INTERVAL:  8s
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-b5ld4 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-b5ld4:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age                  From               Message
+  ----    ------     ----                 ----               -------
+  Normal  Scheduled  3m55s                default-scheduler  Successfully assigned shop4/shop-batch-5cb58d4c57-5rldf to shop4-worker2
+  Normal  Pulled     26s (x2 over 3m54s)  kubelet            Container image "lab4/batch:0.1.0" already present on machine
+  Normal  Created    25s (x2 over 3m54s)  kubelet            Created container: batch
+  Normal  Started    25s (x2 over 3m53s)  kubelet            Started container batch

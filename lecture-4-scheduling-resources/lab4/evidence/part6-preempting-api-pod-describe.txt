@@ -1,0 +1,54 @@
+Name:                 shop-api-67cb47cc65-x42h5
+Namespace:            shop4
+Priority:             1000000
+Priority Class Name:  shop-critical
+Service Account:      default
+Node:                 shop4-worker/
+Labels:               app.kubernetes.io/instance=shop
+                      app.kubernetes.io/managed-by=Helm
+                      app.kubernetes.io/name=api
+                      app.kubernetes.io/part-of=shop
+                      helm.sh/chart=shop-0.2.0
+                      pod-template-hash=67cb47cc65
+Annotations:          <none>
+Status:               Pending
+IP:                   
+IPs:                  <none>
+Controlled By:        ReplicaSet/shop-api-67cb47cc65
+Containers:
+  api:
+    Image:      lab4/api:0.1.0
+    Port:       8080/TCP
+    Host Port:  0/TCP
+    Limits:
+      cpu:     400m
+      memory:  100Mi
+    Requests:
+      cpu:      400m
+      memory:   100Mi
+    Liveness:   http-get http://:http/health delay=5s timeout=1s period=10s #success=1 #failure=3
+    Readiness:  http-get http://:http/health delay=2s timeout=1s period=5s #success=1 #failure=3
+    Environment:
+      DATABASE_URL:  postgres://shop:shop@shop-postgres-rw:5432/shop?sslmode=disable
+      HEALTH_FAIL:   false
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-nzlgb (ro)
+Conditions:
+  Type           Status
+  PodScheduled   True 
+Volumes:
+  kube-api-access-nzlgb:
+    Type:                     Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:   3607
+    ConfigMapName:            kube-root-ca.crt
+    ConfigMapOptional:        <nil>
+    DownwardAPI:              true
+QoS Class:                    Guaranteed
+Node-Selectors:               <none>
+Tolerations:                  node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                              node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Topology Spread Constraints:  kubernetes.io/hostname:DoNotSchedule when max skew 1 is exceeded for selector app.kubernetes.io/instance=shop,app.kubernetes.io/name=api
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  24s   default-scheduler  Successfully assigned shop4/shop-api-67cb47cc65-x42h5 to shop4-worker

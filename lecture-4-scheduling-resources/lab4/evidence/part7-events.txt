@@ -1,0 +1,117 @@
+LAST SEEN   TYPE      REASON                   OBJECT                                  MESSAGE
+17m         Normal    NoPods                   poddisruptionbudget/shop-api            No matching pods found
+17m         Normal    ScalingReplicaSet        deployment/shop-batch                   Scaled up replica set shop-batch-6944446d4c from 0 to 2
+17m         Normal    NoPods                   poddisruptionbudget/shop-postgres-pdb   No matching pods found
+17m         Normal    ScalingReplicaSet        deployment/shop-worker                  Scaled up replica set shop-worker-6947b75f9c from 0 to 2
+17m         Normal    ScalingReplicaSet        deployment/shop-api                     Scaled up replica set shop-api-67cb47cc65 from 0 to 3
+17m         Normal    Scheduled                pod/shop-api-67cb47cc65-r8w6j           Successfully assigned shop4/shop-api-67cb47cc65-r8w6j to shop4-worker
+17m         Normal    Scheduled                pod/shop-batch-6944446d4c-wr4wb         Successfully assigned shop4/shop-batch-6944446d4c-wr4wb to shop4-worker
+17m         Normal    SuccessfulCreate         replicaset/shop-batch-6944446d4c        Created pod: shop-batch-6944446d4c-wr4wb
+17m         Normal    Scheduled                pod/shop-api-67cb47cc65-bgkvj           Successfully assigned shop4/shop-api-67cb47cc65-bgkvj to shop4-worker2
+17m         Normal    SuccessfulCreate         replicaset/shop-batch-6944446d4c        Created pod: shop-batch-6944446d4c-sjshh
+17m         Normal    Scheduled                pod/shop-worker-6947b75f9c-dsmgd        Successfully assigned shop4/shop-worker-6947b75f9c-dsmgd to shop4-worker
+17m         Normal    Scheduled                pod/shop-batch-6944446d4c-sjshh         Successfully assigned shop4/shop-batch-6944446d4c-sjshh to shop4-worker2
+17m         Normal    SuccessfulCreate         replicaset/shop-api-67cb47cc65          Created pod: shop-api-67cb47cc65-r8w6j
+17m         Normal    SuccessfulCreate         replicaset/shop-api-67cb47cc65          Created pod: shop-api-67cb47cc65-bgkvj
+17m         Normal    SuccessfulCreate         replicaset/shop-api-67cb47cc65          Created pod: shop-api-67cb47cc65-nhm6c
+17m         Normal    Scheduled                pod/shop-worker-6947b75f9c-v29f9        Successfully assigned shop4/shop-worker-6947b75f9c-v29f9 to shop4-worker2
+17m         Normal    Scheduled                pod/shop-api-67cb47cc65-nhm6c           Successfully assigned shop4/shop-api-67cb47cc65-nhm6c to shop4-worker2
+17m         Normal    SuccessfulCreate         replicaset/shop-worker-6947b75f9c       Created pod: shop-worker-6947b75f9c-v29f9
+17m         Normal    SuccessfulCreate         replicaset/shop-worker-6947b75f9c       Created pod: shop-worker-6947b75f9c-dsmgd
+17m         Normal    Pulled                   pod/shop-batch-6944446d4c-sjshh         Container image "lab4/batch:0.1.0" already present on machine
+17m         Normal    Created                  pod/shop-batch-6944446d4c-sjshh         Created container: batch
+17m         Normal    CreatingServiceAccount   cluster/shop-postgres                   Creating ServiceAccount
+17m         Normal    Started                  pod/shop-batch-6944446d4c-sjshh         Started container batch
+17m         Normal    Pulled                   pod/shop-api-67cb47cc65-nhm6c           Container image "lab4/api:0.1.0" already present on machine
+17m         Normal    Pulled                   pod/shop-batch-6944446d4c-wr4wb         Container image "lab4/batch:0.1.0" already present on machine
+17m         Normal    Pulled                   pod/shop-worker-6947b75f9c-v29f9        Container image "lab4/worker:0.1.0" already present on machine
+17m         Normal    Created                  pod/shop-batch-6944446d4c-wr4wb         Created container: batch
+17m         Normal    Created                  pod/shop-api-67cb47cc65-r8w6j           Created container: api
+17m         Normal    Pulled                   pod/shop-api-67cb47cc65-r8w6j           Container image "lab4/api:0.1.0" already present on machine
+17m         Normal    CreatingRole             cluster/shop-postgres                   Creating Cluster Role
+17m         Normal    Created                  pod/shop-worker-6947b75f9c-v29f9        Created container: worker
+17m         Normal    Created                  pod/shop-api-67cb47cc65-bgkvj           Created container: api
+17m         Normal    Created                  pod/shop-api-67cb47cc65-nhm6c           Created container: api
+17m         Normal    Pulled                   pod/shop-api-67cb47cc65-bgkvj           Container image "lab4/api:0.1.0" already present on machine
+17m         Normal    Created                  pod/shop-worker-6947b75f9c-dsmgd        Created container: worker
+17m         Normal    CreatingInstance         cluster/shop-postgres                   Primary instance (initdb)
+17m         Normal    SuccessfulCreate         job/shop-postgres-1-initdb              Created pod: shop-postgres-1-initdb-2szkf
+17m         Normal    ExternalProvisioning     persistentvolumeclaim/shop-postgres-1   Waiting for a volume to be created either by the external provisioner 'rancher.io/local-path' or manually by the system administrator. If volume creation is delayed, please verify that the provisioner is running and correctly registered.
+17m         Normal    Started                  pod/shop-api-67cb47cc65-bgkvj           Started container api
+17m         Normal    Started                  pod/shop-api-67cb47cc65-nhm6c           Started container api
+17m         Normal    Started                  pod/shop-api-67cb47cc65-r8w6j           Started container api
+17m         Normal    Pulled                   pod/shop-worker-6947b75f9c-dsmgd        Container image "lab4/worker:0.1.0" already present on machine
+17m         Normal    Started                  pod/shop-batch-6944446d4c-wr4wb         Started container batch
+17m         Normal    WaitForFirstConsumer     persistentvolumeclaim/shop-postgres-1   waiting for first consumer to be created before binding
+17m         Normal    Provisioning             persistentvolumeclaim/shop-postgres-1   External provisioner is provisioning volume for claim "shop4/shop-postgres-1"
+17m         Normal    Started                  pod/shop-worker-6947b75f9c-v29f9        Started container worker
+17m         Normal    Started                  pod/shop-worker-6947b75f9c-dsmgd        Started container worker
+17m         Normal    ProvisioningSucceeded    persistentvolumeclaim/shop-postgres-1   Successfully provisioned volume pvc-4be2cc28-5037-4353-a809-1fadacf7231c
+17m         Normal    Scheduled                pod/shop-postgres-1-initdb-2szkf        Successfully assigned shop4/shop-postgres-1-initdb-2szkf to shop4-worker
+17m         Normal    Pulled                   pod/shop-postgres-1-initdb-2szkf        Container image "ghcr.io/cloudnative-pg/cloudnative-pg:1.30.1" already present on machine
+17m         Normal    Created                  pod/shop-postgres-1-initdb-2szkf        Created container: bootstrap-controller
+17m         Normal    Started                  pod/shop-postgres-1-initdb-2szkf        Started container bootstrap-controller
+17m         Normal    Pulling                  pod/shop-postgres-1-initdb-2szkf        Pulling image "ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie"
+15m         Normal    Created                  pod/shop-postgres-1-initdb-2szkf        Created container: initdb
+15m         Normal    Pulled                   pod/shop-postgres-1-initdb-2szkf        Successfully pulled image "ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie" in 1m15.343s (1m15.343s including waiting). Image size: 278504235 bytes.
+15m         Normal    Started                  pod/shop-postgres-1-initdb-2szkf        Started container initdb
+15m         Normal    Completed                job/shop-postgres-1-initdb              Job completed
+15m         Normal    Scheduled                pod/shop-postgres-1                     Successfully assigned shop4/shop-postgres-1 to shop4-worker
+15m         Normal    Pulled                   pod/shop-postgres-1                     Container image "ghcr.io/cloudnative-pg/cloudnative-pg:1.30.1" already present on machine
+15m         Normal    Created                  pod/shop-postgres-1                     Created container: bootstrap-controller
+15m         Normal    Started                  pod/shop-postgres-1                     Started container bootstrap-controller
+15m         Normal    Pulled                   pod/shop-postgres-1                     Container image "ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie" already present on machine
+15m         Normal    Created                  pod/shop-postgres-1                     Created container: postgres
+15m         Normal    Started                  pod/shop-postgres-1                     Started container postgres
+14m         Normal    SuccessfulCreate         replicaset/shop-batch-6745dc6bb5        Created pod: shop-batch-6745dc6bb5-9zfx8
+14m         Normal    ScalingReplicaSet        deployment/shop-batch                   Scaled up replica set shop-batch-6745dc6bb5 from 0 to 1
+14m         Normal    Pulled                   pod/shop-batch-6745dc6bb5-9zfx8         Container image "lab4/batch:0.1.0" already present on machine
+14m         Normal    Scheduled                pod/shop-batch-6745dc6bb5-9zfx8         Successfully assigned shop4/shop-batch-6745dc6bb5-9zfx8 to shop4-worker
+14m         Normal    Started                  pod/shop-batch-6745dc6bb5-9zfx8         Started container batch
+14m         Normal    Created                  pod/shop-batch-6745dc6bb5-9zfx8         Created container: batch
+14m         Normal    SuccessfulDelete         replicaset/shop-batch-6944446d4c        Deleted pod: shop-batch-6944446d4c-wr4wb
+14m         Normal    ScalingReplicaSet        deployment/shop-batch                   Scaled down replica set shop-batch-6944446d4c from 2 to 1
+14m         Normal    ScalingReplicaSet        deployment/shop-batch                   Scaled up replica set shop-batch-6745dc6bb5 from 1 to 2
+14m         Normal    Scheduled                pod/shop-batch-6745dc6bb5-rxt2b         Successfully assigned shop4/shop-batch-6745dc6bb5-rxt2b to shop4-worker2
+14m         Normal    Killing                  pod/shop-batch-6944446d4c-wr4wb         Stopping container batch
+14m         Normal    SuccessfulCreate         replicaset/shop-batch-6745dc6bb5        Created pod: shop-batch-6745dc6bb5-rxt2b
+14m         Normal    Pulled                   pod/shop-batch-6745dc6bb5-rxt2b         Container image "lab4/batch:0.1.0" already present on machine
+14m         Normal    Started                  pod/shop-batch-6745dc6bb5-rxt2b         Started container batch
+14m         Normal    Created                  pod/shop-batch-6745dc6bb5-rxt2b         Created container: batch
+14m         Normal    SuccessfulDelete         replicaset/shop-batch-6944446d4c        Deleted pod: shop-batch-6944446d4c-sjshh
+14m         Normal    ScalingReplicaSet        deployment/shop-batch                   Scaled down replica set shop-batch-6944446d4c from 1 to 0
+14m         Normal    Killing                  pod/shop-batch-6944446d4c-sjshh         Stopping container batch
+8m59s       Normal    ScalingReplicaSet        deployment/shop-batch                   Scaled up replica set shop-batch-5cc46c5bd4 from 0 to 1
+8m58s       Normal    Pulled                   pod/shop-batch-5cc46c5bd4-flbq7         Container image "lab4/batch:0.1.0" already present on machine
+8m58s       Normal    SuccessfulCreate         replicaset/shop-batch-5cc46c5bd4        Created pod: shop-batch-5cc46c5bd4-flbq7
+8m58s       Normal    Scheduled                pod/shop-batch-5cc46c5bd4-flbq7         Successfully assigned shop4/shop-batch-5cc46c5bd4-flbq7 to shop4-worker
+8m58s       Normal    Created                  pod/shop-batch-5cc46c5bd4-flbq7         Created container: batch
+8m57s       Normal    Started                  pod/shop-batch-5cc46c5bd4-flbq7         Started container batch
+8m51s       Normal    Scheduled                pod/shop-batch-5cc46c5bd4-jffnw         Successfully assigned shop4/shop-batch-5cc46c5bd4-jffnw to shop4-worker2
+8m51s       Normal    SuccessfulDelete         replicaset/shop-batch-6745dc6bb5        Deleted pod: shop-batch-6745dc6bb5-9zfx8
+8m51s       Normal    ScalingReplicaSet        deployment/shop-batch                   Scaled down replica set shop-batch-6745dc6bb5 from 2 to 1
+8m51s       Normal    ScalingReplicaSet        deployment/shop-batch                   Scaled up replica set shop-batch-5cc46c5bd4 from 1 to 2
+8m51s       Normal    Killing                  pod/shop-batch-6745dc6bb5-9zfx8         Stopping container batch
+8m51s       Normal    SuccessfulCreate         replicaset/shop-batch-5cc46c5bd4        Created pod: shop-batch-5cc46c5bd4-jffnw
+8m50s       Normal    Started                  pod/shop-batch-5cc46c5bd4-jffnw         Started container batch
+8m50s       Normal    Pulled                   pod/shop-batch-5cc46c5bd4-jffnw         Container image "lab4/batch:0.1.0" already present on machine
+8m50s       Normal    Created                  pod/shop-batch-5cc46c5bd4-jffnw         Created container: batch
+8m48s       Normal    ScalingReplicaSet        deployment/shop-batch                   Scaled down replica set shop-batch-6745dc6bb5 from 1 to 0
+8m48s       Normal    Killing                  pod/shop-batch-6745dc6bb5-rxt2b         Stopping container batch
+8m48s       Normal    SuccessfulDelete         replicaset/shop-batch-6745dc6bb5        Deleted pod: shop-batch-6745dc6bb5-rxt2b
+3m55s       Normal    SuccessfulCreate         replicaset/shop-batch-5cb58d4c57        Created pod: shop-batch-5cb58d4c57-5rldf
+3m55s       Normal    Scheduled                pod/shop-batch-5cb58d4c57-5rldf         Successfully assigned shop4/shop-batch-5cb58d4c57-5rldf to shop4-worker2
+3m47s       Normal    SuccessfulDelete         replicaset/shop-batch-5cc46c5bd4        Deleted pod: shop-batch-5cc46c5bd4-jffnw
+3m47s       Normal    Scheduled                pod/shop-batch-5cb58d4c57-jxrzc         Successfully assigned shop4/shop-batch-5cb58d4c57-jxrzc to shop4-worker
+3m47s       Normal    Killing                  pod/shop-batch-5cc46c5bd4-jffnw         Stopping container batch
+3m47s       Normal    SuccessfulCreate         replicaset/shop-batch-5cb58d4c57        Created pod: shop-batch-5cb58d4c57-jxrzc
+3m44s       Normal    SuccessfulDelete         replicaset/shop-batch-5cc46c5bd4        Deleted pod: shop-batch-5cc46c5bd4-flbq7
+3m44s       Normal    ScalingReplicaSet        deployment/shop-batch                   (combined from similar events): Scaled down replica set shop-batch-5cc46c5bd4 from 1 to 0
+3m44s       Normal    Killing                  pod/shop-batch-5cc46c5bd4-flbq7         Stopping container batch
+26s         Normal    Pulled                   pod/shop-batch-5cb58d4c57-5rldf         Container image "lab4/batch:0.1.0" already present on machine
+25s         Normal    Started                  pod/shop-batch-5cb58d4c57-5rldf         Started container batch
+25s         Normal    Created                  pod/shop-batch-5cb58d4c57-5rldf         Created container: batch
+18s         Warning   Unhealthy                pod/shop-batch-5cb58d4c57-jxrzc         Liveness probe failed: Get "http://10.244.1.15:8080/health": dial tcp 10.244.1.15:8080: connect: connection refused
+17s         Normal    Pulled                   pod/shop-batch-5cb58d4c57-jxrzc         Container image "lab4/batch:0.1.0" already present on machine
+17s         Normal    Created                  pod/shop-batch-5cb58d4c57-jxrzc         Created container: batch
+17s         Normal    Started                  pod/shop-batch-5cb58d4c57-jxrzc         Started container batch
