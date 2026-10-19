@@ -1,0 +1,34 @@
+Captured via: docker exec shop4-worker2 dmesg | grep -i "out of memory|oom|killed process"
+Context: batch.memoryMB raised to 2300 (Part 7), two batch pods (1 per worker node) growing
+toward that target while each container's own resources.limits.memory was still 2Gi (2048Mi).
+
+[14204.957133] batch invoked oom-killer: gfp_mask=0xcc0(GFP_KERNEL), order=0, oom_score_adj=990
+[14204.957184]  oom_kill_process.cold+0xb/0x10
+[14204.957601] [  pid  ]   uid  tgid total_vm      rss pgtables_bytes swapents oom_score_adj name
+[14204.959282] oom-kill:constraint=CONSTRAINT_MEMCG,nodemask=(null),cpuset=cri-containerd-4ef0d472e8ba7e15297d119f840cfc0127edc86d3bae0898b135a530b4c5fd77.scope,mems_allowed=0,oom_memcg=/docker/56cc44905c0aa79a60f5baccb23639e5879ba84a19f412362e5f590c1cee81c1/kubelet.slice/kubelet-kubepods.slice/kubelet-kubepods-burstable.slice/kubelet-kubepods-burstable-pod2e7019b5_6088_4753_93cc_d07a09351fb3.slice,task_memcg=/docker/56cc44905c0aa79a60f5baccb23639e5879ba84a19f412362e5f590c1cee81c1/kubelet.slice/kubelet-kubepods.slice/kubelet-kubepods-burstable.slice/kubelet-kubepods-burstable-pod2e7019b5_6088_4753_93cc_d07a09351fb3.slice/cri-containerd-4ef0d472e8ba7e15297d119f840cfc0127edc86d3bae0898b135a530b4c5fd77.scope,task=batch,pid=67103,uid=65532
+[14204.960451] Memory cgroup out of memory: Killed process 67103 (batch) total-vm:3329980kB, anon-rss:2091504kB, file-rss:2812kB, shmem-rss:0kB, UID:65532 pgtables:4184kB oom_score_adj:990
+
+[14327.555886] batch invoked oom-killer: gfp_mask=0xcc0(GFP_KERNEL), order=0, oom_score_adj=990
+[14327.555938]  oom_kill_process.cold+0xb/0x10
+[14327.556179] [  pid  ]   uid  tgid total_vm      rss pgtables_bytes swapents oom_score_adj name
+[14327.556198] oom-kill:constraint=CONSTRAINT_MEMCG,nodemask=(null),cpuset=cri-containerd-1ae689f4f7196702ca815a48465cc1b5aa7a35c7c9be631245802816a8a29755.scope,mems_allowed=0,oom_memcg=/docker/6c1b28a2672b07ec3ae76ba9fc25cd73b14566cfe0e638e4b5f47e9a484598c8/kubelet.slice/kubelet-kubepods.slice/kubelet-kubepods-burstable.slice/kubelet-kubepods-burstable-podb014e181_2caa_440d_bffd_6b2af5c2f59c.slice,task_memcg=/docker/6c1b28a2672b07ec3ae76ba9fc25cd73b14566cfe0e638e4b5f47e9a484598c8/kubelet.slice/kubelet-kubepods.slice/kubelet-kubepods-burstable.slice/kubelet-kubepods-burstable-podb014e181_2caa_440d_bffd_6b2af5c2f59c.slice/cri-containerd-1ae689f4f7196702ca815a48465cc1b5aa7a35c7c9be631245802816a8a29755.scope,task=batch,pid=67908,uid=65532
+[14327.556762] Memory cgroup out of memory: Killed process 67908 (batch) total-vm:3591628kB, anon-rss:2091828kB, file-rss:3236kB, shmem-rss:0kB, UID:65532 pgtables:4176kB oom_score_adj:990
+
+Analysis:
+- constraint=CONSTRAINT_MEMCG + the cgroup path ending in the pod's own
+  cri-containerd-<id>.scope (not the node's root/kubepods-level cgroup) means
+  both kills were scoped to the INDIVIDUAL CONTAINER's own memory cgroup —
+  i.e. "OOMKilled by own limit", not a whole-node eviction.
+- anon-rss ~2091504-2091828kB (~2044MiB) sits right at the container's
+  resources.limits.memory: 2Gi (2048Mi) — confirms the container was killed
+  for exceeding ITS OWN declared limit, consistent with the memcg scope.
+- oom_score_adj=990 is exactly what kubelet sets for a Burstable pod whose
+  request is far below its limit (close to the BestEffort end of the scale,
+  990 out of a max of 1000) — this is the mechanism (not kubelet's soft
+  eviction manager) that would make batch the preferred kernel OOM victim
+  over api/postgres (Guaranteed, oom_score_adj=-997) if a REAL whole-node
+  OOM ever occurred instead of a per-pod one.
+- kubectl's own status.containerStatuses[].lastState.terminated.reason showed
+  the generic string "Error" (not "OOMKilled") for both kills, exit code 137.
+  dmesg is the only place the kill is unambiguously confirmed as OOM — see
+  README, Part 7, for why this matters.

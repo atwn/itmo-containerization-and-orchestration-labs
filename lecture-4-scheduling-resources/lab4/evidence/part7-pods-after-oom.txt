@@ -1,0 +1,9 @@
+NAME                           READY   STATUS    RESTARTS      AGE     IP            NODE            NOMINATED NODE   READINESS GATES
+shop-api-67cb47cc65-bgkvj      1/1     Running   0             17m     10.244.2.8    shop4-worker2   <none>           <none>
+shop-api-67cb47cc65-nhm6c      1/1     Running   0             17m     10.244.2.9    shop4-worker2   <none>           <none>
+shop-api-67cb47cc65-r8w6j      1/1     Running   0             17m     10.244.1.7    shop4-worker    <none>           <none>
+shop-batch-5cb58d4c57-5rldf    1/1     Running   1 (26s ago)   3m55s   10.244.2.12   shop4-worker2   <none>           <none>
+shop-batch-5cb58d4c57-jxrzc    1/1     Running   1 (18s ago)   3m47s   10.244.1.15   shop4-worker    <none>           <none>
+shop-postgres-1                1/1     Running   0             15m     10.244.1.12   shop4-worker    <none>           <none>
+shop-worker-6947b75f9c-dsmgd   1/1     Running   0             17m     10.244.1.9    shop4-worker    <none>           <none>
+shop-worker-6947b75f9c-v29f9   1/1     Running   0             17m     10.244.2.6    shop4-worker2   <none>           <none>

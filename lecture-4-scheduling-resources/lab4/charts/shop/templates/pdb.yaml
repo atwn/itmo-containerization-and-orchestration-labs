@@ -1,0 +1,37 @@
+{{- if .Values.api.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "shop.fullname" . }}-api
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: api
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  minAvailable: {{ .Values.api.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+---
+{{- if .Values.postgres.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  # Deliberately not "<fullname>-postgres": CNPG's own auto-managed PDB (when
+  # enablePDB isn't set to false) is named exactly after the Cluster object,
+  # i.e. "shop-postgres" too. Reusing that name here meant the operator's
+  # reconcile loop deleted OUR PDB on every pass, believing it was cleaning up
+  # its own — see README, Part 5.
+  name: {{ include "shop.fullname" . }}-postgres-pdb
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  minAvailable: {{ .Values.postgres.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      cnpg.io/cluster: {{ include "shop.fullname" . }}-postgres
+{{- end }}

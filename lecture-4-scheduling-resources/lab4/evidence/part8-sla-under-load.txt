@@ -1,0 +1,37 @@
+Part 8 — SLA on the order path under overload (stated SLA: p95 < 300ms, 0% errors).
+
+=== Run A: batch.replicaCount=16, batch.cpuWorkers=2 (its default, real CPU burn up to its
+limit), api/postgres already Guaranteed with krr-informed requests=limits (400m/100Mi api,
+300m/140Mi postgres), batch scarcity already producing 2 Pending batch pods ===
+
+k6 (in-cluster Job, 15 VUs, 4m):
+  checks_succeeded: 100.00%, http_req_failed: 0.00% (1744/1744 requests, zero errors)
+  http_req_duration: avg=1.65s med=802.51ms p(90)=4.83s p(95)=6.09s max=11.8s
+  THRESHOLD 'p(95)<300ms' FAILED
+api pods: 0 restarts throughout (all 3 stayed Ready the whole run)
+
+Honest reading: the error-rate half of the SLA held perfectly (0%), and Guaranteed QoS/priority
+did its scheduling-level job — api was never preempted, evicted, or restarted. But the latency
+half of the SLA did NOT hold. Root cause, confirmed from the scheduling lecture material itself:
+cpu.shares (the kernel's real, moment-to-moment CPU time-slicing weight) is set proportional to
+a container's `requests`, not to its Kubernetes PriorityClass. With batch.replicaCount=16 at
+1500m request each, batch's aggregate requested CPU (24000m) vastly outweighs api's (3 x 400m =
+1200m), so under real contention on the 2-real-core-capped nodes, the kernel's CFS scheduler
+handed the majority of actual CPU time to batch, despite batch being the lower-priority,
+"sacrificial" workload. PriorityClass/QoS protect admission (who gets scheduled, who gets
+preempted/evicted) — they do not by themselves protect real execution-time CPU share.
+
+=== Run B: same setup, batch.cpuWorkers lowered to 0 (declared reservation for Part 6's
+scarcity math kept identical; real CPU demand removed) ===
+This isolates the variable: batch still reserves the same requests (still causes Pending/
+preemption, Part 6 unaffected) but no longer actively contends for real CPU cycles.
+Operationally this run hit the cluster-wide pod-churn/kubelet-backlog issue described in
+VERIFICATION.md before a clean matching k6 result could be captured a second time — see
+VERIFICATION.md for exactly what was and wasn't re-confirmed live.
+
+Conclusion carried into the README: the error-rate SLA is a direct, verified result of
+Guaranteed QoS + PriorityClass (api never fails, never gets evicted, regardless of how hard
+batch is pushed). The latency SLA additionally requires bounding batch's aggregate *requested*
+CPU relative to the real per-node core count — a capacity-planning problem, not a QoS/priority
+problem. Both are real, both are documented, and the gap between them is itself the most
+useful finding of Part 8.

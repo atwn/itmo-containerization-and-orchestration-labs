@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shop.fullname" . }}-batch
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: batch
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.batch.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: batch
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "shop.commonLabels" . | nindent 8 }}
+        app.kubernetes.io/name: batch
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- if .Values.batch.priorityClassName }}
+      priorityClassName: {{ .Values.batch.priorityClassName }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: batch
+          image: "{{ .Values.batch.image.repository }}:{{ .Values.batch.image.tag }}"
+          imagePullPolicy: {{ .Values.batch.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - name: CPU_WORKERS
+              value: {{ .Values.batch.cpuWorkers | quote }}
+            - name: MEMORY_MB
+              value: {{ .Values.batch.memoryMB | quote }}
+            - name: MEMORY_STEP_MB
+              value: {{ .Values.batch.memoryStepMB | quote }}
+            - name: MEMORY_STEP_INTERVAL
+              value: {{ .Values.batch.memoryStepInterval | quote }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.batch.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.batch.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.batch.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.batch.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.batch.probes.readiness.periodSeconds }}
+      terminationGracePeriodSeconds: 5

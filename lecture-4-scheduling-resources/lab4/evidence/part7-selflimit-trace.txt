@@ -1,0 +1,84 @@
+18:27:32 pod=shop-batch-5cfb956788-4l8dk restarts=0 lastReason=
+18:27:41 pod=shop-batch-5cfb956788-4l8dk restarts=0 lastReason=
+18:27:50 pod=shop-batch-5cfb956788-4l8dk restarts=0 lastReason=
+18:27:59 pod=shop-batch-5cfb956788-4l8dk restarts=0 lastReason=
+18:28:08 pod=shop-batch-5cfb956788-4l8dk restarts=0 lastReason=
+18:28:17 pod=shop-batch-5cfb956788-4l8dk restarts=0 lastReason=
+18:28:26 pod=shop-batch-5cfb956788-4l8dk restarts=1 lastReason=Error
+RESTART DETECTED: reason=Error
+Name:                 shop-batch-5cfb956788-4l8dk
+Namespace:            shop4
+Priority:             -1000
+Priority Class Name:  shop-batch
+Service Account:      default
+Node:                 shop4-worker2/172.20.0.2
+Start Time:           Sun, 11 Oct 2026 18:27:22 +0300
+Labels:               app.kubernetes.io/instance=shop
+                      app.kubernetes.io/managed-by=Helm
+                      app.kubernetes.io/name=batch
+                      app.kubernetes.io/part-of=shop
+                      helm.sh/chart=shop-0.2.0
+                      pod-template-hash=5cfb956788
+Annotations:          <none>
+Status:               Running
+IP:                   10.244.2.13
+IPs:
+  IP:           10.244.2.13
+Controlled By:  ReplicaSet/shop-batch-5cfb956788
+Containers:
+  batch:
+    Container ID:   containerd://009a3025bb4539458342ab43a9ba7983b471c64083aeba4f625dd44b8b7b162d
+    Image:          lab4/batch:0.1.0
+    Image ID:       sha256:dd202e155e8073b40edf2664c3537fd2b8bdb2c28118325abd59240f6307834f
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Sun, 11 Oct 2026 18:28:20 +0300
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    137
+      Started:      Sun, 11 Oct 2026 18:27:23 +0300
+      Finished:     Sun, 11 Oct 2026 18:28:19 +0300
+    Ready:          True
+    Restart Count:  1
+    Limits:
+      cpu:     1900m
+      memory:  2Gi
+    Requests:
+      cpu:      1500m
+      memory:   128Mi
+    Liveness:   http-get http://:http/health delay=5s timeout=1s period=10s #success=1 #failure=3
+    Readiness:  http-get http://:http/health delay=2s timeout=1s period=5s #success=1 #failure=3
+    Environment:
+      CPU_WORKERS:           0
+      MEMORY_MB:             2500
+      MEMORY_STEP_MB:        200
+      MEMORY_STEP_INTERVAL:  5s
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-mjm2m (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-mjm2m:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age               From               Message
+  ----     ------     ----              ----               -------
+  Normal   Scheduled  65s               default-scheduler  Successfully assigned shop4/shop-batch-5cfb956788-4l8dk to shop4-worker2
+  Normal   Pulled     8s (x2 over 64s)  kubelet            Container image "lab4/batch:0.1.0" already present on machine
+  Warning  Unhealthy  8s                kubelet            Readiness probe failed: Get "http://10.244.2.13:8080/health": dial tcp 10.244.2.13:8080: connect: connection refused
+  Normal   Created    7s (x2 over 64s)  kubelet            Created container: batch
+  Normal   Started    7s (x2 over 64s)  kubelet            Started container batch

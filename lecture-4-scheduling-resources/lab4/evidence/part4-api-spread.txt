@@ -1,0 +1,4 @@
+NAME                        READY   STATUS    RESTARTS   AGE     IP           NODE            NOMINATED NODE   READINESS GATES
+shop-api-67cb47cc65-bgkvj   1/1     Running   0          2m32s   10.244.2.8   shop4-worker2   <none>           <none>
+shop-api-67cb47cc65-nhm6c   1/1     Running   0          2m32s   10.244.2.9   shop4-worker2   <none>           <none>
+shop-api-67cb47cc65-r8w6j   1/1     Running   0          2m33s   10.244.1.7   shop4-worker    <none>           <none>

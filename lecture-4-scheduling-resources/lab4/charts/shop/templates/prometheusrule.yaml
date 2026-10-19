@@ -1,0 +1,57 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "shop.fullname" . }}
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: monitoring
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  groups:
+    - name: shop.rules
+      rules:
+        # SLA (Part 8): the critical order path must keep a low error rate
+        # even while batch is being sacrificed under pressure.
+        - alert: ShopAPIHighErrorRate
+          expr: |
+            (sum(rate(shop_api_http_requests_total{job="api",status=~"5..",route!~"/health|/metrics"}[2m])) or vector(0))
+            /
+            clamp_min((sum(rate(shop_api_http_requests_total{job="api",route!~"/health|/metrics"}[2m])) or vector(0)), 0.001)
+            > {{ .Values.monitoring.alerts.errorRateThreshold }}
+          for: {{ .Values.monitoring.alerts.errorRateFor }}
+          labels:
+            severity: critical
+          annotations:
+            summary: Shop API has a high HTTP 5xx rate
+            description: More than {{ mulf .Values.monitoring.alerts.errorRateThreshold 100 }}% of business requests return 5xx — the SLA on the order path is at risk.
+
+        # SLA (Part 8): latency is the other half of the SLA this lab sets.
+        - alert: ShopAPIHighLatencyP95
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (
+                rate(shop_api_http_request_duration_seconds_bucket{job="api",route!~"/health|/metrics"}[5m])
+              )
+            ) > {{ .Values.monitoring.alerts.latencyP95Seconds }}
+          for: {{ .Values.monitoring.alerts.latencyFor }}
+          labels:
+            severity: warning
+          annotations:
+            summary: Shop API p95 latency is high
+            description: Aggregated p95 latency is above {{ .Values.monitoring.alerts.latencyP95Seconds }} second.
+
+        # Scheduling pressure (Part 6/7): pods stuck Pending for a while is
+        # exactly the symptom of requests outrunning what the cluster can fit
+        # — the signal to look for preemption/eviction, not a crash.
+        - alert: ShopNamespacePodsPending
+          expr: |
+            sum(kube_pod_status_phase{namespace="{{ .Release.Namespace }}", phase="Pending"}) > 0
+          for: {{ .Values.monitoring.alerts.pendingFor }}
+          labels:
+            severity: warning
+          annotations:
+            summary: Pods stuck Pending in the shop namespace
+            description: At least one pod has been Pending for over {{ .Values.monitoring.alerts.pendingFor }} — the cluster no longer fits everything by requests.
+{{- end }}
