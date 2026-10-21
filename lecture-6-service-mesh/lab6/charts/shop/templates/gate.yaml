@@ -1,0 +1,66 @@
+{{- if and .Values.gate.enabled .Values.traffic.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "shop.fullname" . }}-gate
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: gate
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: {{ include "shop.fullname" . }}-gate}
+rules:
+  - apiGroups: ["policy.linkerd.io"]
+    resources: ["httproutes"]
+    resourceNames: [{{ printf "%s-api" (include "shop.fullname" .) | quote }}]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: {{ include "shop.fullname" . }}-gate}
+subjects: [{kind: ServiceAccount, name: {{ include "shop.fullname" . }}-gate}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ include "shop.fullname" . }}-gate}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shop.fullname" . }}-gate
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: gate
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: gate, app.kubernetes.io/instance: {{ .Release.Name }}}
+  template:
+    metadata:
+      labels:
+        {{- include "shop.commonLabels" . | nindent 8 }}
+        app.kubernetes.io/name: gate
+      annotations: {shop.lab/gate-run: {{ .Values.gate.runId | quote }}}
+    spec:
+      serviceAccountName: {{ include "shop.fullname" . }}-gate
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: gate
+          image: "{{ .Values.gate.image.repository }}:{{ .Values.gate.image.tag }}"
+          imagePullPolicy: {{ .Values.gate.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - name: POD_NAMESPACE
+              valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
+            - {name: PROMETHEUS_URL, value: "http://kube-prometheus-stack-prometheus.monitoring:9090"}
+            - {name: ROUTE_NAME, value: {{ printf "%s-api" (include "shop.fullname" .) | quote }}}
+            - {name: INTERVAL_SECONDS, value: {{ .Values.gate.intervalSeconds | quote }}}
+            - {name: WARMUP_SECONDS, value: {{ .Values.gate.warmupSeconds | quote }}}
+            - {name: ERROR_THRESHOLD, value: {{ .Values.gate.errorThreshold | quote }}}
+            - {name: LATENCY_THRESHOLD_SECONDS, value: {{ .Values.gate.latencyThresholdSeconds | quote }}}
+            - {name: MIN_REQUEST_RATE, value: {{ .Values.gate.minRequestRate | quote }}}
+            - {name: SUCCESS_WINDOWS, value: {{ .Values.gate.successWindows | quote }}}
+            - {name: STEP_PERCENT, value: {{ .Values.gate.stepPercent | quote }}}
+            - {name: INITIAL_V2_WEIGHT, value: {{ .Values.traffic.v2Weight | quote }}}
+          resources: {requests: {cpu: 10m, memory: 24Mi}, limits: {cpu: 100m, memory: 64Mi}}
+{{- end }}

@@ -1,0 +1,25 @@
+{{- if and .Values.mesh.enabled .Values.traffic.enabled }}
+apiVersion: policy.linkerd.io/v1beta2
+kind: HTTPRoute
+metadata:
+  name: {{ include "shop.fullname" . }}-api
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: api
+  annotations:
+    retry.linkerd.io/http: {{ .Values.traffic.retries.statuses | quote }}
+    retry.linkerd.io/limit: {{ .Values.traffic.retries.limit | quote }}
+    retry.linkerd.io/timeout: {{ .Values.traffic.retries.timeout | quote }}
+spec:
+  parentRefs:
+    - {name: {{ include "shop.fullname" . }}-api, kind: Service, group: core, port: {{ .Values.api.service.port }}}
+  rules:
+    {{- if .Values.api.v2.enabled }}
+    - backendRefs:
+        - {name: {{ include "shop.fullname" . }}-api, port: {{ .Values.api.service.port }}, weight: {{ .Values.traffic.v1Weight }}}
+        - {name: {{ include "shop.fullname" . }}-api-v2, port: {{ .Values.api.service.port }}, weight: {{ .Values.traffic.v2Weight }}}
+    {{- else }}
+    - matches:
+        - path: {type: PathPrefix, value: /}
+    {{- end }}
+{{- end }}
