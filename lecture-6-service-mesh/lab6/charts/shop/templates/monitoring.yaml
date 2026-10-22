@@ -1,0 +1,52 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "shop.fullname" . }}
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: shop-monitoring
+spec:
+  namespaceSelector: {matchNames: [{{ .Release.Namespace }}]}
+  selector: {matchLabels: {shop.metrics/enabled: "true"}}
+  endpoints: [{port: http, path: /metrics, interval: {{ .Values.monitoring.interval }}, scrapeTimeout: {{ .Values.monitoring.scrapeTimeout }}}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "shop.fullname" . }}-linkerd-proxies
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: shop-monitoring
+spec:
+  namespaceSelector: {matchNames: [{{ .Release.Namespace }}]}
+  selector: {matchLabels: {app.kubernetes.io/part-of: shop}}
+  podMetricsEndpoints: [{port: linkerd-admin, path: /metrics, interval: {{ .Values.monitoring.interval }}, scrapeTimeout: {{ .Values.monitoring.scrapeTimeout }}}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "shop.fullname" . }}
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: shop-monitoring
+spec:
+  groups:
+    - name: shop-mesh.rules
+      rules:
+        - alert: ShopCanaryHighErrorRate
+          expr: ((sum(rate(shop_api_http_requests_total{version="v2",status=~"5..",route="/order"}[1m])) or vector(0)) / clamp_min((sum(rate(shop_api_http_requests_total{version="v2",route="/order"}[1m])) or vector(0)), 0.001)) > {{ .Values.monitoring.alerts.canaryErrorRateThreshold }}
+          for: {{ .Values.monitoring.alerts.for }}
+          labels: {severity: critical}
+          annotations: {summary: Canary v2 exceeds its error budget, description: The v2 backend error rate is above the promotion threshold.}
+        - alert: ShopCanaryHighLatencyP95
+          expr: histogram_quantile(0.95, sum by (le) (rate(shop_api_http_request_duration_seconds_bucket{version="v2",route="/order"}[2m]))) > {{ .Values.monitoring.alerts.canaryLatencyP95Seconds }}
+          for: {{ .Values.monitoring.alerts.for }}
+          labels: {severity: warning}
+          annotations: {summary: Canary v2 p95 latency is high, description: The canary should not be promoted while tail latency is above the threshold.}
+        - alert: ShopLinkerdProxyNotReady
+          expr: max by (namespace, pod) (kube_pod_container_status_ready{namespace={{ .Release.Namespace | quote }},container="linkerd-proxy"}) == 0
+          for: {{ .Values.monitoring.alerts.for }}
+          labels: {severity: critical}
+          annotations: {summary: A Shop Linkerd proxy is not ready, description: Traffic can lose mesh policy while a data-plane proxy is unavailable.}
+{{- end }}

@@ -1,0 +1,82 @@
+nameOverride: ""
+fullnameOverride: shop
+
+databaseURL: postgres://shop:shop@shop-postgres-rw:5432/shop?sslmode=disable
+
+mesh:
+  enabled: true
+  proxyResources:
+    cpuRequest: 10m
+    memoryRequest: 20Mi
+    cpuLimit: 200m
+    memoryLimit: 100Mi
+
+api:
+  image:
+    repository: shop-mesh-api
+    pullPolicy: IfNotPresent
+  service: {port: 80, targetPort: 8080}
+  v1: {enabled: true, replicas: 2, tag: v1-lab6, flaky: false, flakyRate: "0.30"}
+  v2: {enabled: true, replicas: 1, tag: v2-lab6, fail: false}
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 250m, memory: 128Mi}
+
+loadgen:
+  enabled: true
+  image: {repository: shop-mesh-loadgen, tag: v1, pullPolicy: IfNotPresent}
+  interval: 100ms
+  resources:
+    requests: {cpu: 10m, memory: 16Mi}
+    limits: {cpu: 100m, memory: 64Mi}
+
+worker:
+  enabled: true
+  replicas: 2
+  image: {repository: shop-mesh-worker, tag: v1, pullPolicy: IfNotPresent}
+  pollInterval: 1s
+  service: {port: 8080, targetPort: 8080}
+  resources:
+    requests: {cpu: 25m, memory: 32Mi}
+    limits: {cpu: 100m, memory: 64Mi}
+
+traffic:
+  enabled: true
+  v1Weight: 90
+  v2Weight: 10
+  retries: {statuses: "500", limit: "2", timeout: 500ms}
+
+gate:
+  enabled: true
+  image: {repository: shop-mesh-gate, tag: v1, pullPolicy: IfNotPresent}
+  runId: final
+  intervalSeconds: "15"
+  warmupSeconds: "60"
+  errorThreshold: "0.05"
+  latencyThresholdSeconds: "0.5"
+  minRequestRate: "0.1"
+  successWindows: "2"
+  stepPercent: "10"
+
+postgres:
+  instances: 1
+  storage: {size: 1Gi, storageClass: local-path}
+  database: shop
+  owner: shop
+  credentials: {username: shop, password: shop}
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+
+monitoring:
+  enabled: true
+  interval: 10s
+  scrapeTimeout: 5s
+  dashboard: {enabled: true}
+  alerts: {canaryErrorRateThreshold: 0.05, canaryLatencyP95Seconds: 0.5, for: 1m}
+
+podSecurityContext: {runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, fsGroup: 65532}
+containerSecurityContext:
+  privileged: false
+  allowPrivilegeEscalation: false
+  capabilities: {drop: ["ALL"]}

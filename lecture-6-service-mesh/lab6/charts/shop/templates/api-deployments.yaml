@@ -1,0 +1,86 @@
+{{- if .Values.api.v1.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shop.fullname" . }}-api-v1
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: api
+    app.kubernetes.io/version: v1
+spec:
+  replicas: {{ .Values.api.v1.replicas }}
+  selector:
+    matchLabels: {app.kubernetes.io/name: api, app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/version: v1}
+  template:
+    metadata:
+      labels:
+        {{- include "shop.commonLabels" . | nindent 8 }}
+        app.kubernetes.io/name: api
+        app.kubernetes.io/version: v1
+      annotations:
+        {{- include "shop.meshAnnotations" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "shop.fullname" . }}-api
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.v1.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - {name: VERSION, value: v1}
+            - {name: FLAKY, value: {{ .Values.api.v1.flaky | quote }}}
+            - {name: FLAKY_RATE, value: {{ .Values.api.v1.flakyRate | quote }}}
+            - {name: DATABASE_URL, value: {{ .Values.databaseURL | quote }}}
+          ports: [{name: http, containerPort: {{ .Values.api.service.targetPort }}}]
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          readinessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 5, periodSeconds: 10}
+{{- end }}
+{{- if and .Values.api.v1.enabled .Values.api.v2.enabled }}
+---
+{{- end }}
+{{- if .Values.api.v2.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shop.fullname" . }}-api-v2
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: api
+    app.kubernetes.io/version: v2
+spec:
+  replicas: {{ .Values.api.v2.replicas }}
+  selector:
+    matchLabels: {app.kubernetes.io/name: api, app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/version: v2}
+  template:
+    metadata:
+      labels:
+        {{- include "shop.commonLabels" . | nindent 8 }}
+        app.kubernetes.io/name: api
+        app.kubernetes.io/version: v2
+      annotations:
+        {{- include "shop.meshAnnotations" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "shop.fullname" . }}-api
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.v2.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - {name: VERSION, value: v2}
+            - {name: FAIL, value: {{ .Values.api.v2.fail | quote }}}
+            - {name: DATABASE_URL, value: {{ .Values.databaseURL | quote }}}
+          ports: [{name: http, containerPort: {{ .Values.api.service.targetPort }}}]
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          readinessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 5, periodSeconds: 10}
+{{- end }}

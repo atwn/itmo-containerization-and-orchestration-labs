@@ -1,0 +1,52 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shop.fullname" . }}-worker
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels: {app.kubernetes.io/name: worker, app.kubernetes.io/instance: {{ .Release.Name }}}
+  template:
+    metadata:
+      labels:
+        {{- include "shop.commonLabels" . | nindent 8 }}
+        app.kubernetes.io/name: worker
+    spec:
+      serviceAccountName: {{ include "shop.fullname" . }}-worker
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: worker
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - {name: DATABASE_URL, value: {{ .Values.databaseURL | quote }}}
+            - {name: POLL_INTERVAL, value: {{ .Values.worker.pollInterval | quote }}}
+          ports: [{name: http, containerPort: {{ .Values.worker.service.targetPort }}}]
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          readinessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 2, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /health, port: http}, initialDelaySeconds: 5, periodSeconds: 10}
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "shop.fullname" . }}-worker
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: worker
+    shop.metrics/enabled: "true"
+spec:
+  selector: {app.kubernetes.io/name: worker, app.kubernetes.io/instance: {{ .Release.Name }}}
+  ports: [{name: http, port: {{ .Values.worker.service.port }}, targetPort: http}]
+{{- end }}

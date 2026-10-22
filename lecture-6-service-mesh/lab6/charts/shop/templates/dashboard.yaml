@@ -1,0 +1,13 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "shop.fullname" . }}-dashboard
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: shop-monitoring
+    grafana_dashboard: "1"
+data:
+  shop-mesh.json: |-
+{{ .Files.Get "dashboards/shop-mesh.json" | indent 4 }}
+{{- end }}
