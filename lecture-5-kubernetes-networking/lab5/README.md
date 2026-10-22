@@ -67,3 +67,144 @@ kubectl --context kind-lab5 apply \
 
 ---
 
+### Часть 1 — Разверни shop и исследуй сеть пода
+
+Развернули сервисы приложения "shop" из 3-й лабораторной на двух worker-нодах в кластере kind.
+
+<details>
+<summary>Предустановка</summary>
+
+```bash
+# (optional) local-path as default storageclass (unless already provided by kind):
+kubectl --context kind-lab5 apply -f \
+    https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.37/deploy/local-path-storage.yaml
+kubectl --context kind-lab5 patch storageclass local-path --type merge \
+    -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+# CloudNativePG
+helm repo add cnpg https://cloudnative-pg.github.io/charts
+helm repo update
+helm --kube-context kind-lab5 upgrade --install cnpg cnpg/cloudnative-pg \
+    --version 0.29.1 \
+    --namespace cnpg-system \
+    --create-namespace \
+    -f platform/cnpg-values.yaml \
+    --wait \
+    --timeout 10m
+
+# (optional) re-initialize CNI if needed (e.g. when token is expired):
+kubectl --context kind-lab5 -n calico-system \
+  rollout restart daemonset/calico-node
+kubectl --context kind-lab5 -n calico-system \
+  rollout status daemonset/calico-node --timeout=180s
+
+# Observability stack (Prometheus + Grafana):
+helm --kube-context kind-lab5 upgrade --install kps \
+  prometheus-community/kube-prometheus-stack \
+  --version 90.1.1 \
+  --namespace obs \
+  --create-namespace \
+  -f deploy/kube-prometheus-stack.yaml \
+  --wait --timeout 15m
+
+```
+</details>
+
+---
+
+```bash
+# build and load images into the kind cluster:
+docker build -f Dockerfile.api -t ghcr.io/shop-lab/api:v3 .
+docker build -f Dockerfile.worker -t ghcr.io/shop-lab/worker:v2 .
+
+kind load docker-image ghcr.io/shop-lab/api:v3 --name lab5
+kind load docker-image ghcr.io/shop-lab/worker:v2 --name lab5
+
+# bring up 'shop' services via Helm:
+helm --kube-context kind-lab5 upgrade \
+  --install shop charts/shop \
+  --namespace shop --create-namespace \
+  --wait --timeout 15m
+```
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part1-00-b.png" width=100%>
+</details>
+
+---
+
+#### Инспекция сети
+
+##### 1. Сеть внутри pod'а
+
+Приняли решение использовать эфемерный debug-контейнер для работы с сетью внутри pod'а,
+так как минимальный базовый образ `api` и `worker` не содержит необходимых утилит
+(ситуация вполне типичная и для продуктового окружения).
+
+Внутри `api` pod'а на ноде `lab5-worker`:
+* `if19` - veth на ноде, к которому "подключен" сетевой интерфейс pod'а
+* `10.244.219.204` - ip адрес виртуального NIC pod'а из пула адресов Calico, совпадает с адресом pod'а на ноде
+* `/32` - маска подсети, означает что адрес один, а значит маршрут проходит через виртуальный next-hop
+* `169.254.1.1` - link-local адрес, означает что маршрутизация осуществляется через Calica контроллер на ноде
+* `10.96.0.10` - ClusterIP CoreDNS кластера, т.е. разрешение имён происходит внутри кластера
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part1-01-api.png" width=100%>
+</details>
+
+---
+
+Внутри `worker` pod'а на ноде `lab5-worker-2`:
+* `if16` - veth на ноде, к которому "подключен" сетевой интерфейс pod'а
+* `10.244.124.73` - ip адрес виртуального NIC pod'а из пула адресов Calico, совпадает с адресом pod'а на ноде
+* `/32` - маска подсети, означает что адрес один, а значит маршрут проходит через виртуальный next-hop
+* `169.254.1.1` - link-local адрес, означает что маршрутизация осуществляется через Calica контроллер на ноде
+* `10.96.0.10` - ClusterIP CoreDNS кластера, т.е. разрешение имён происходит внутри кластера
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part1-01-worker.png" width=100%>
+</details>
+
+---
+
+##### 2. Связь pod-интерфейса с veth на ноде
+
+ifindex 19 `api` pod'a соответствует veth интерфейсу под соответствующим номером на `lab5-worker` ноде.
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part1-01-node-w1.png" width=100%>
+</details>
+
+---
+
+ifindex 16 `worker` pod'a соответствует veth интерфейсу под соответствующим номером на `lab5-worker2` ноде.
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part1-01-node-w2.png" width=100%>
+</details>
+
+---
+
+##### 3. Межнодовый трафик
+
+Поробовали достучаться из pod'a `api` в pod `worker` по IP и по DNS-имени.
+Для демонстрации выбрали pod'ы, расположенные на двух разных нодах.
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part1-01-connection.png" width=100%>
+</details>
+
+---
+
