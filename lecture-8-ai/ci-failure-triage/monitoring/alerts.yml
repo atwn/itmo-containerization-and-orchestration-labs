@@ -1,0 +1,44 @@
+groups:
+  - name: ci-triage.rules
+    rules:
+      # The automation itself is broken (workflow bug, MCP server down,
+      # Ollama unreachable) — the webhook call from CI succeeds at the HTTP
+      # level but the workflow throws, so failures are otherwise silent to
+      # the humans who stopped manually triaging in favor of this bot.
+      - alert: TriageWebhookHighErrorRate
+        expr: |
+          (sum(rate(n8n_webhook_request_duration_seconds_count{status_code!~"2.."}[5m])) or vector(0))
+          /
+          clamp_min(sum(rate(n8n_webhook_request_duration_seconds_count[5m])), 0.001)
+          > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: CI triage webhook has a high error rate
+          description: More than 10% of triage webhook calls are failing — the automation is not reliably triaging CI failures.
+
+      # The agent step (LLM + two MCP round trips) is the slow part of the
+      # workflow; if it creeps up, CI failures queue up behind it instead of
+      # being triaged within a reasonable time of the pipeline failing.
+      - alert: TriageWebhookHighLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(n8n_webhook_request_duration_seconds_bucket[5m]))) > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: CI triage is slow
+          description: p95 time to triage a CI failure is above 20s for 5 minutes — the agent/MCP/model chain is degraded.
+
+      # The whole automation stopped running. Classic availability alert —
+      # without it, a dead n8n instance just means CI failures silently pile
+      # up with zero triage and zero signal that anything is wrong.
+      - alert: TriageInstanceDown
+        expr: up{job="n8n"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: n8n (CI triage automation) is down
+          description: Prometheus has not been able to scrape the n8n instance for 1 minute — the triage workflow cannot receive webhooks at all.

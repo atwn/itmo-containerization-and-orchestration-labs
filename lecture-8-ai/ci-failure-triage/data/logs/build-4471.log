@@ -1,0 +1,10 @@
+[2026-10-21T09:12:03Z] Pipeline: billing-service #4471 (branch: main)
+[2026-10-21T09:12:03Z] Job: install-dependencies
+[2026-10-21T09:12:04Z] Running: npm ci
+[2026-10-21T09:12:04Z] npm WARN deprecated some-old-pkg@1.2.3: no longer maintained
+[2026-10-21T09:14:34Z] npm ERR! code ETIMEDOUT
+[2026-10-21T09:14:34Z] npm ERR! network timeout at: https://registry.npmjs.org/@nestjs%2fcommon
+[2026-10-21T09:14:34Z] npm ERR! network This is a problem related to network connectivity.
+[2026-10-21T09:14:34Z] npm ERR! network In most cases you are behind a proxy or have bad network settings.
+[2026-10-21T09:14:34Z] Job install-dependencies failed with exit code 1
+[2026-10-21T09:14:34Z] Pipeline billing-service #4471 FAILED at step: install-dependencies

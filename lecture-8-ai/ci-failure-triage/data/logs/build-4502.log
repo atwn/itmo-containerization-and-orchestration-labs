@@ -1,0 +1,17 @@
+[2026-10-21T11:03:11Z] Pipeline: payments-api #4502 (branch: feature/refund-flow)
+[2026-10-21T11:03:11Z] Job: unit-tests
+[2026-10-21T11:03:12Z] Running: pytest tests/ -v
+[2026-10-21T11:03:48Z] tests/refunds/test_partial_refund.py::test_partial_refund_amount_rounding FAILED
+[2026-10-21T11:03:48Z]
+[2026-10-21T11:03:48Z] ================================= FAILURES =================================
+[2026-10-21T11:03:48Z] ____________________ test_partial_refund_amount_rounding ____________________
+[2026-10-21T11:03:48Z]
+[2026-10-21T11:03:48Z]     def test_partial_refund_amount_rounding():
+[2026-10-21T11:03:48Z]         refund = compute_partial_refund(total=19.99, fraction=0.3333)
+[2026-10-21T11:03:48Z] >       assert refund == 6.66
+[2026-10-21T11:03:48Z] E       AssertionError: assert 6.6700000000000004 == 6.66
+[2026-10-21T11:03:48Z]
+[2026-10-21T11:03:48Z] tests/refunds/test_partial_refund.py:42: AssertionError
+[2026-10-21T11:03:48Z] ========================= 1 failed, 87 passed in 36.21s =========================
+[2026-10-21T11:03:48Z] Job unit-tests failed with exit code 1
+[2026-10-21T11:03:48Z] Pipeline payments-api #4502 FAILED at step: unit-tests

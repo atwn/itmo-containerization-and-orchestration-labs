@@ -1,0 +1,138 @@
+{
+  "name": "CI Failure Triage Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ci-failure",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "n1-webhook",
+      "name": "CI Failure Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [0, 300],
+      "webhookId": "ci-failure-triage"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body ?? $input.item.json;\nconst required = ['repo', 'branch', 'job_id', 'log_path'];\nfor (const key of required) {\n  if (!body[key]) {\n    throw new Error(`Missing required field in CI webhook payload: ${key}`);\n  }\n}\nreturn [{\n  json: {\n    repo: body.repo,\n    branch: body.branch,\n    job_id: body.job_id,\n    log_path: body.log_path,\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "n2-validate",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst item = $input.item.json;\nconst logContent = fs.readFileSync(item.log_path, 'utf8');\nconst knownIssues = fs.readFileSync('/data/known-issues.md', 'utf8');\nreturn [{\n  json: {\n    ...item,\n    log_content: logContent,\n    known_issues_content: knownIssues\n  }\n}];"
+      },
+      "id": "n2b-load-context",
+      "name": "Load Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [330, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Pipeline failure event:\nrepo: {{ $json.repo }}\nbranch: {{ $json.branch }}\njob_id: {{ $json.job_id }}\n\n--- FAILURE LOG (already read for you, do not call read_file) ---\n{{ $json.log_content }}\n\n--- KNOWN ISSUES KNOWLEDGE BASE (already read for you, do not call read_file) ---\n{{ $json.known_issues_content }}\n\nFollow your triage procedure for this event using the log and known-issues text above. Finish by querying incident history, deciding severity/status, inserting the incident row, and writing the report file.",
+        "hasOutputParser": false,
+        "options": {
+          "systemMessage": "You are the CI failure triage assistant. The user message already contains the full failure log and the full known-issues knowledge base as plain text, copied verbatim below the repo/branch/job_id fields — that text is everything you need to compare them. You do not have any file-reading tool in this run (no read_file, no read_text_file, no list_directory) — only a sqlite tool and a write_file tool are available. Do not attempt to call a reading tool, it does not exist and will fail; use the log/known-issues text already in this message instead. Use the repo/branch/job_id values exactly as given in the event fields above — never substitute a company or product name for the repo.\n\nFor every event, follow this exact procedure:\n\n1. Go through the known-issues text entry by entry (each entry has its own heading, usually starting with an ID like KI-00x). For each entry, write one short line: either \"KI-00x: MATCH - <the exact phrase from the log that also appears in this entry's symptom pattern>\" or \"KI-00x: no match\". Only ever call it a MATCH if you can quote a phrase that literally appears in both the log text above and that entry's symptom description — a shared general topic (e.g. both being about npm, or both about tests) is NOT enough on its own without a shared specific phrase. Do this for every entry before moving on.\n2. Query the sqlite `incidents` table using the read_query tool (it only accepts SELECT): if step 1 found a known-issue match with some ID, query WHERE repo = this event's repo AND known_issue_id = that same ID (in quotes) — this is what tells you whether this repo has hit that pattern before. If step 1 found no match at all, query WHERE repo = this event's repo instead, just for context. Never add job_id to this WHERE clause — job_id is unique to this one run and will never match a past incident, so filtering by it always returns nothing useful; filter only by repo and known_issue_id.\n3. Decide the outcome, in this order:\n   - No known-issue match at all -> new failure. severity=medium (or high if the log shows data loss/security/payment-path impact). status=requires_human_review.\n   - Known-issue match AND the step-2 query already returned a row with that known_issue_id for this repo -> status=auto_resolved, use the known issue's standard severity.\n   - Known-issue match BUT the step-2 query returned no row with that known_issue_id for this repo (first time this pattern hits this repo) -> severity one step up from the known issue's standard severity, status=requires_human_review.\n4. Insert a row into the `incidents` table using the write_query tool (NOT read_query — read_query will reject an INSERT, write_query is the one that accepts it): created_at (ISO timestamp), repo, branch, job_id, known_issue_id, severity, status, summary. known_issue_id MUST be the literal matched ID in quotes, e.g. 'KI-001', whenever step 1 found a match — put the actual value in the SQL, never the word NULL when there was a match. Only use NULL for known_issue_id when step 1 found no match at all. This insert is a required tool call, not optional, do it even for an auto-resolved case.\n5. Write a report file. Build the path yourself as \"/data/reports/\" followed by the job_id from the event, followed by \".md\" — e.g. for job_id \"build-4471\" the path is exactly \"/data/reports/build-4471.md\". Content: a one-line verdict, the matched known issue (if any) and why it did or didn't auto-resolve, the severity/status, and the recommended next action for a human. Keep it under 200 words. This is a required tool call, not optional.\n\nNever invent a known-issue ID that isn't in the known-issues text above. Never mark something auto_resolved without an actual matching row found via the query tool in this run. Steps 4 and 5 must both actually happen via real tool calls — describing them in your final reply without having called the tools does not count, and is never acceptable. If a tool call returns an error (wrong tool name, wrong argument, anything), that step has NOT happened yet — read the error, pick the correct tool or argument, and call it again until it actually succeeds. Never tell the user a row was inserted or a file was written unless the matching tool call in this same run actually returned success, not an error — if you are unsure whether a call succeeded, look at its result again before claiming it did.\n\nAfter finishing, reply with a short plain-text summary of what you decided (verdict, severity, status, confirmation that the incident row and the report file were actually written by tool calls in this run)."
+        }
+      },
+      "id": "n3-agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "model": "qwen2.5:3b",
+        "options": {}
+      },
+      "id": "n4-ollama",
+      "name": "Ollama Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [360, 520],
+      "credentials": {
+        "ollamaApi": {
+          "id": "Y2T2KPsFXPiQ10k9",
+          "name": "Ollama local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "endpointUrl": "http://mcp-filesystem:8000/sse",
+        "serverTransport": "sse",
+        "authentication": "none",
+        "include": "selected",
+        "includeTools": ["write_file"]
+      },
+      "id": "n5-mcp-fs",
+      "name": "MCP Filesystem",
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.4,
+      "position": [520, 520]
+    },
+    {
+      "parameters": {
+        "endpointUrl": "http://mcp-sqlite:8001/sse",
+        "serverTransport": "sse",
+        "authentication": "none",
+        "include": "selected",
+        "includeTools": ["read_query", "write_query"]
+      },
+      "id": "n6-mcp-sqlite",
+      "name": "MCP SQLite",
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.4,
+      "position": [680, 520]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"triaged\", \"job_id\": $('Validate Payload').item.json.job_id, \"repo\": $('Validate Payload').item.json.repo, \"agent_summary\": $json.output } }}",
+        "options": {}
+      },
+      "id": "n7-respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [660, 300]
+    }
+  ],
+  "connections": {
+    "CI Failure Webhook": {
+      "main": [[{ "node": "Validate Payload", "type": "main", "index": 0 }]]
+    },
+    "Validate Payload": {
+      "main": [[{ "node": "Load Context", "type": "main", "index": 0 }]]
+    },
+    "Load Context": {
+      "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]]
+    },
+    "AI Agent": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "MCP Filesystem": {
+      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+    },
+    "MCP SQLite": {
+      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

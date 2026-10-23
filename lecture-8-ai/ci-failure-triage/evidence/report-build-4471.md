@@ -1,0 +1,1 @@
+Verdict: KI-001, Severity: medium, Status: auto_resolved, Next Action: Retry the job.

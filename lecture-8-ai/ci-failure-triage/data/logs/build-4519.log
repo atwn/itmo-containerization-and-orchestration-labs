@@ -1,0 +1,10 @@
+[2026-10-21T14:27:02Z] Pipeline: analytics-worker #4519 (branch: main)
+[2026-10-21T14:27:02Z] Job: docker-build
+[2026-10-21T14:27:02Z] Running: docker build -t analytics-worker:4519 .
+[2026-10-21T14:27:03Z] Step 4/11 : RUN pip install -r requirements.txt
+[2026-10-21T14:29:51Z] Collecting pandas==2.2.0
+[2026-10-21T14:30:40Z] Collecting pyarrow==15.0.0
+[2026-10-21T14:31:17Z] Killed
+[2026-10-21T14:31:17Z] The command '/bin/sh -c pip install -r requirements.txt' returned a non-zero code: 137
+[2026-10-21T14:31:17Z] Job docker-build failed with exit code 137
+[2026-10-21T14:31:17Z] Pipeline analytics-worker #4519 FAILED at step: docker-build

@@ -1,0 +1,94 @@
+name: ci-failure-triage
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ci-triage-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks: [ci-triage]
+
+  # Wraps the official filesystem MCP server (stdio) and exposes it over SSE,
+  # since n8n's MCP Client Tool node speaks SSE/HTTP, not stdio.
+  mcp-filesystem:
+    image: node:20-alpine
+    container_name: ci-triage-mcp-fs
+    working_dir: /app
+    command: >
+      sh -c "npx -y supergateway --stdio 'npx -y @modelcontextprotocol/server-filesystem /data' --port 8000 --baseUrl http://mcp-filesystem:8000 --ssePath /sse --messagePath /message"
+    volumes:
+      - ./data:/data
+    ports:
+      - "8000:8000"
+    networks: [ci-triage]
+
+  # Wraps a Node sqlite MCP server the same way, pointed at the seeded
+  # incidents.db (mock incident history).
+  mcp-sqlite:
+    image: node:20-alpine
+    container_name: ci-triage-mcp-sqlite
+    working_dir: /app
+    command: >
+      sh -c "npx -y supergateway --stdio 'npx -y mcp-server-sqlite-npx /data/incidents.db' --port 8001 --baseUrl http://mcp-sqlite:8001 --ssePath /sse --messagePath /message"
+    volumes:
+      - ./data:/data
+    ports:
+      - "8001:8001"
+    networks: [ci-triage]
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: ci-triage-n8n
+    environment:
+      - N8N_METRICS=true
+      - N8N_METRICS_INCLUDE_WEBHOOK_METRICS=true
+      - N8N_METRICS_INCLUDE_WORKFLOW_INFO=true
+      - N8N_SECURE_COOKIE=false
+      - GENERIC_TIMEZONE=Europe/Moscow
+      - N8N_RUNNERS_ENABLED=true
+      - NODE_FUNCTION_ALLOW_BUILTIN=fs
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./data:/data
+    networks: [ci-triage]
+    depends_on: [ollama, mcp-filesystem, mcp-sqlite]
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ci-triage-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports:
+      - "9090:9090"
+    networks: [ci-triage]
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ci-triage-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./monitoring/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks: [ci-triage]
+    depends_on: [prometheus]
+
+networks:
+  ci-triage:
+
+volumes:
+  ollama-data:
+  n8n-data:
+  grafana-data:
