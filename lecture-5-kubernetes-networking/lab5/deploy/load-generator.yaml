@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-load-script
+  namespace: shop
+data:
+  load-generator.sh: |
+    #!/bin/sh
+    set -eu
+
+    : "${RPS:=1}"
+    : "${TARGET_URL:=http://shop-api.shop.svc.cluster.local/health}"
+
+    if ! awk -v rps="$RPS" 'BEGIN { exit !(rps > 0) }'; then
+      echo "RPS must be a positive number" >&2
+      exit 2
+    fi
+
+    interval=$(awk -v rps="$RPS" 'BEGIN { printf "%.6f", 1 / rps }')
+
+    echo "starting load: rps=$RPS interval=${interval}s url=$TARGET_URL" >&2
+
+    while :; do
+      timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+      if response=$(curl -sS -o /dev/null \
+          -w '%{http_code} %{time_total}' \
+          --connect-timeout 1 \
+          --max-time 2 \
+          "$TARGET_URL"); then
+        status=${response%% *}
+        latency_s=${response#* }
+
+        case "$status" in
+          2*) result=ok ;;
+          *)  result=failed ;;
+        esac
+      else
+        status=000
+        latency_s=2.000000
+        result=failed
+      fi
+
+      printf '{"ts":"%s","result":"%s","status":"%s","latency_s":%s}\n' \
+        "$timestamp" "$result" "$status" "$latency_s"
+
+      sleep "$interval"
+    done
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chaos-load
+  namespace: shop
+  labels:
+    app.kubernetes.io/name: chaos-load
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chaos-load
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chaos-load
+    spec:
+      containers:
+        - name: load-generator
+          image: curlimages/curl:latest
+          imagePullPolicy: Always
+          command: ["/bin/sh", "/scripts/load-generator.sh"]
+          env:
+            - name: RPS
+              value: "1"
+            - name: TARGET_URL
+              value: http://shop-api.shop.svc.cluster.local/health
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            name: chaos-load-script
+            defaultMode: 0755
