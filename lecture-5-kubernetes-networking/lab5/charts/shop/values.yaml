@@ -1,23 +1,17 @@
-nameOverride: ""
-fullnameOverride: ""
-
+nameOverride: ''
+fullnameOverride: ''
 databaseURL: postgres://shop:shop@shop-postgres-rw:5432/shop?sslmode=disable
-
 api:
   replicaCount: 4
-
   image:
     repository: ghcr.io/shop-lab/api
     tag: v3
     pullPolicy: IfNotPresent
-
   service:
-    type: ClusterIP
+    type: NodePort
     port: 80
     targetPort: 8080
-
   healthFail: false
-
   probes:
     liveness:
       initialDelaySeconds: 5
@@ -25,7 +19,6 @@ api:
     readiness:
       initialDelaySeconds: 2
       periodSeconds: 5
-
   resources:
     requests:
       cpu: 50m
@@ -33,22 +26,17 @@ api:
     limits:
       cpu: 250m
       memory: 128Mi
-
 worker:
   replicaCount: 2
-
   image:
     repository: ghcr.io/shop-lab/worker
     tag: v2
     pullPolicy: IfNotPresent
-
   service:
     type: ClusterIP
     port: 8080
     targetPort: 8080
-
   pollInterval: 1s
-
   probes:
     liveness:
       initialDelaySeconds: 5
@@ -56,7 +44,6 @@ worker:
     readiness:
       initialDelaySeconds: 2
       periodSeconds: 5
-
   resources:
     requests:
       cpu: 25m
@@ -64,16 +51,13 @@ worker:
     limits:
       cpu: 100m
       memory: 64Mi
-
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 65532
   runAsGroup: 65532
-
 containerSecurityContext:
   privileged: false
   allowPrivilegeEscalation: false
-
 monitoring:
   enabled: true
   interval: 15s
@@ -86,21 +70,16 @@ monitoring:
     errorRateFor: 2m
     latencyP95Seconds: 1
     latencyFor: 5m
-
 postgres:
   instances: 1
-
   storage:
     size: 1Gi
     storageClass: local-path
-
   database: shop
   owner: shop
-
   credentials:
     username: shop
     password: shop
-
   resources:
     requests:
       cpu: 100m
