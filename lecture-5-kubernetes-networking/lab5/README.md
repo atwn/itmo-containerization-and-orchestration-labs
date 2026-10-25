@@ -324,11 +324,28 @@ helm --kube-context kind-lab5 upgrade --install alloy grafana/alloy \
   --namespace obs --create-namespace \
   -f deploy/alloy.yaml \
   --wait --timeout 10m
+
+# refresh Grafana dashboards
+helm --kube-context kind-lab5 upgrade shop ./charts/shop \
+  --namespace shop \
+  --reuse-values
+
+# start port-forwarding
+./scripts/port-forward.sh start
 ```
 
 </details>
 
-**(to be continued...)**
+Получили два графика: один отображает latency по логам из `chaos-load` Pod'а, а другой отслеживает количество активных подов в `api` Deployment'е по метрикам Prometheus.
+На них мы видим как растёт latency во время удаления Pod'ов. При этом, все запросы по-прежнему обрабатываются успешно.
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part2-02-chaos-graphana.png" width=100%>
+</details>
+
+---
 
 #### Ответы на вопросы части 2
 

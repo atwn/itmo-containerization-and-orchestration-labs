@@ -169,6 +169,57 @@
       "targets": [
         { "refId": "A", "expr": "sum(increase(shop_worker_processing_errors_total{job=\"worker\"}[15m]))", "legendFormat": "errors" }
       ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Load-generator latency",
+      "description": "Latency measured by the in-cluster chaos-load generator and stored in Loki.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "min": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "quantile_over_time(0.50, {job=\"shop/chaos-load\",result=\"ok\"} | json | unwrap latency_s [1m]) by (job)",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "quantile_over_time(0.95, {job=\"shop/chaos-load\",result=\"ok\"} | json | unwrap latency_s [1m]) by (job)",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "API scrape availability",
+      "description": "Number of API replicas currently reachable by Prometheus. Pod deletion events appear as temporary drops.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "min": 0 },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["min", "max"] },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(up{job=\"api\"})",
+          "legendFormat": "ready API scrape targets"
+        }
+      ]
     }
   ]
 }
