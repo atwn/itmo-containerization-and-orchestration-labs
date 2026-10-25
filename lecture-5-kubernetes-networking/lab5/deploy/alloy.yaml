@@ -52,14 +52,17 @@ alloy:
       loki.process "app_logs" {
         stage.json {
           expressions = {
-            level = "level",
-            ts    = "ts",
+            result    = "result",
+            status    = "status",
+            latency_s = "latency_s",
+            ts        = "ts",
           }
         }
 
         stage.labels {
           values = {
-            level = "",
+            result = "",
+            status = "",
           }
         }
 

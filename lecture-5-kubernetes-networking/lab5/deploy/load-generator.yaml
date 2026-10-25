@@ -9,7 +9,7 @@ data:
     set -eu
 
     : "${RPS:=1}"
-    : "${TARGET_URL:=http://shop-api.shop.svc.cluster.local/health}"
+    : "${TARGET_URL:=http://shop-api.shop.svc.cluster.local./health}"
 
     if ! awk -v rps="$RPS" 'BEGIN { exit !(rps > 0) }'; then
       echo "RPS must be a positive number" >&2
@@ -65,6 +65,10 @@ spec:
       labels:
         app.kubernetes.io/name: chaos-load
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
         - name: load-generator
           image: curlimages/curl:latest
@@ -74,7 +78,7 @@ spec:
             - name: RPS
               value: "1"
             - name: TARGET_URL
-              value: http://shop-api.shop.svc.cluster.local/health
+              value: http://shop-api.shop.svc.cluster.local./health
           volumeMounts:
             - name: script
               mountPath: /scripts
