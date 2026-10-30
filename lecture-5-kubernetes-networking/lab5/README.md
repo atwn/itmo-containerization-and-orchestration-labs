@@ -652,3 +652,106 @@ bash scripts/check-shop-policy.sh
 <img src="./scrs/part4-00-policy.png" width="100%" alt="Девять NetworkPolicy применены: запрос по DNS успешен, заказ через NodePort создан и обработан worker">
 
 </details>
+
+### Часть 5 — Докажи матрицу на практике
+
+#### Ручное сравнение доступа к PostgreSQL
+
+Для наглядного сравнения используем один IP PostgreSQL и порт `5432`,
+меняя источник: API, worker и посторонний Pod. Обращаемся по IP, чтобы
+отделить доступ к БД от разрешения имени через DNS. После проверки запрета
+повторяем разрешённое подключение к той же БД.
+
+<details>
+<summary>Предустановка</summary>
+
+Используем диагностический образ [netprobe](./tools/netprobe/main.go),
+собранный через [Dockerfile.netprobe](./Dockerfile.netprobe) и загруженный
+в kind. Для distroless-приложений запускаем его в ephemeral containers
+внутри настоящих Pod'ов API и worker, сохраняя их сетевую идентичность.
+
+```bash
+docker build -f Dockerfile.netprobe -t ghcr.io/shop-lab/netprobe:v1 .
+kind load docker-image ghcr.io/shop-lab/netprobe:v1 --name lab5
+
+k() { kubectl --context kind-lab5 -n shop "$@"; }
+LAB5_API=$(k get pods -l app.kubernetes.io/name=api,app.kubernetes.io/instance=shop \
+  -o jsonpath='{.items[0].metadata.name}')
+LAB5_WORKER=$(k get pods -l app.kubernetes.io/name=worker,app.kubernetes.io/instance=shop \
+  -o jsonpath='{.items[0].metadata.name}')
+LAB5_PG_IP=$(k get pods -l cnpg.io/cluster=shop-postgres,cnpg.io/instanceRole=primary \
+  -o jsonpath='{.items[0].status.podIP}')
+LAB5_DEBUG="manual-$(date +%y%m%d)"
+LAB5_STRAY="matrix-$LAB5_DEBUG"
+
+for LAB5_POD in "$LAB5_API" "$LAB5_WORKER"; do
+  k debug "pod/$LAB5_POD" --container="$LAB5_DEBUG" \
+    --image=ghcr.io/shop-lab/netprobe:v1 --image-pull-policy=Never \
+    --profile=restricted --attach=false -- /netprobe hold
+done
+k wait --for=jsonpath="{.status.ephemeralContainerStatuses[?(@.name==\"$LAB5_DEBUG\")].state.running.startedAt}" \
+  "pod/$LAB5_API" "pod/$LAB5_WORKER" --timeout=90s
+
+k run "$LAB5_STRAY" --image=ghcr.io/shop-lab/netprobe:v1 \
+  --image-pull-policy=Never --restart=Never \
+  --labels=app.kubernetes.io/name=matrix-probe --command -- /netprobe hold
+k wait --for=condition=Ready "pod/$LAB5_STRAY" --timeout=90s
+```
+
+</details>
+
+```bash
+k get pods "$LAB5_API" "$LAB5_WORKER" "$LAB5_STRAY" \
+  -o wide -L app.kubernetes.io/name
+echo "PostgreSQL: $LAB5_PG_IP:5432"
+
+k exec "$LAB5_API" -c "$LAB5_DEBUG" -- /netprobe tcp "$LAB5_PG_IP" 5432
+k exec "$LAB5_WORKER" -c "$LAB5_DEBUG" -- /netprobe tcp "$LAB5_PG_IP" 5432
+k exec "$LAB5_STRAY" -- /netprobe tcp "$LAB5_PG_IP" 5432
+k exec "$LAB5_API" -c "$LAB5_DEBUG" -- /netprobe tcp "$LAB5_PG_IP" 5432
+```
+
+<details>
+<summary>Демонстрация</summary>
+
+API и worker подключились к PostgreSQL. Посторонний Pod получил тайм-аут,
+а повторное подключение из API прошло успешно: БД оставалась доступна.
+
+<img src="./scrs/part5-00-manual.png" width="100%" alt="Ручная проверка PostgreSQL: API и worker подключаются, посторонний Pod получает тайм-аут, повторная проверка API успешна">
+
+</details>
+
+#### Итоговая матрица
+
+Проверили матрицу [скриптом](./scripts/check-access-matrix.py) из всех текущих
+реплик. Каждая проба открывала новое соединение; TCP-запреты проверяли по IP,
+DNS — отдельно по UDP и TCP. Тайм-аут считали подтверждением запрета только
+при успешных контрольных подключениях к тому же назначению до и после
+эксперимента. Ошибки запуска и `connection refused` не засчитывали как запрет.
+
+<details>
+<summary>Предустановка</summary>
+
+На стенде с применёнными политиками и загруженным образом `netprobe`:
+
+```bash
+python3 scripts/check-access-matrix.py
+```
+
+</details>
+
+<details>
+<summary>Демонстрация</summary>
+
+Получили **38 успешных групп, 87 совпадений с ожиданиями**. API и worker
+подключались к PostgreSQL; посторонний Pod не подключался ни по Pod IP,
+ни по ClusterIP. DNS, мониторинг и служебные связи CNPG работали согласно
+матрице. Внешний egress проверили на `1.1.1.1:443`.
+Контрольные подключения до и после прогона прошли без повторов.
+
+В таблице `EXPECT` — ожидание, `ACTUAL` — результат, `MATCH` — число
+совпавших проб с учётом всех реплик. Проверены указанные назначения и порты.
+
+<img src="./scrs/part5-01-matrix.png" width="100%" alt="Матрица доступа: 38 групп PASS, 87 проб совпали с ожиданиями, положительные контроли прошли">
+
+</details>
