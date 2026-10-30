@@ -1,0 +1,9 @@
+FROM golang:1.22-alpine AS build
+WORKDIR /collector
+COPY tools/flow-metrics/ ./
+RUN GO111MODULE=off CGO_ENABLED=0 go test -v . \
+    && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /flow-metrics main.go
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /flow-metrics /flow-metrics
+ENTRYPOINT ["/flow-metrics"]

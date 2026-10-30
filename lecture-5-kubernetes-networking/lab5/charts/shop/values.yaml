@@ -64,6 +64,20 @@ containerSecurityContext:
   allowPrivilegeEscalation: false
 monitoring:
   enabled: true
+  network:
+    enabled: true
+    namespace: obs
+    calicoNamespace: calico-system
+    whiskerPort: 8081
+    image: ghcr.io/shop-lab/flow-metrics:v1
+    imagePullPolicy: Never
+    whiskerURL: http://whisker.calico-system.svc.cluster.local:8081/whisker-backend/flows
+    alerts:
+      conntrackUsageRatio: 0.8
+      conntrackFor: 2m
+      deniedFor: 30s
+      dnsServfailRatio: 0.05
+      dnsFor: 1m
   interval: 15s
   scrapeTimeout: 5s
   dashboard:

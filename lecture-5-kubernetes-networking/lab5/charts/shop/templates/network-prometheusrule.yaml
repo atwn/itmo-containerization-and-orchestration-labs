@@ -1,0 +1,64 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.network.enabled }}
+{{- $job := printf "%s-flow-metrics" (include "shop.fullname" .) }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "shop.fullname" . }}-network
+  labels:
+    {{- include "shop.commonLabels" . | nindent 4 }}
+spec:
+  groups:
+    - name: shop.network
+      rules:
+        - record: shop:node_conntrack_usage:ratio
+          expr: |
+            max by (instance) (
+              node_nf_conntrack_entries{job="node-exporter"}
+              / node_nf_conntrack_entries_limit{job="node-exporter"}
+            )
+        - record: shop:required_denied_packets:window
+          expr: |
+            max(
+              shop_flow_unexpected_denied_packets_window{job="{{ $job }}"}
+              and on(job, instance) (shop_flow_collector_success{job="{{ $job }}"} == 1)
+              and on(job, instance) (up{job="{{ $job }}"} == 1)
+              and on(job, instance) ((time() - shop_flow_last_observed_timestamp_seconds{job="{{ $job }}"}) < 180)
+            )
+        - record: shop:coredns_servfail:ratio
+          expr: |
+            sum(rate(coredns_dns_responses_total{job="coredns",rcode="SERVFAIL"}[2m]))
+            / clamp_min(sum(rate(coredns_dns_responses_total{job="coredns"}[2m])), 0.001)
+
+        - alert: ShopConntrackPressure
+          expr: shop:node_conntrack_usage:ratio > {{ .Values.monitoring.network.alerts.conntrackUsageRatio }}
+          for: {{ .Values.monitoring.network.alerts.conntrackFor }}
+          labels:
+            severity: warning
+            service: shop
+          annotations:
+            summary: Node conntrack table is close to capacity
+            description: Conntrack usage exceeds {{ mulf .Values.monitoring.network.alerts.conntrackUsageRatio 100 }} percent. New tracked flows may fail if the table fills; this metric covers the entire node.
+
+        - alert: ShopRequiredTrafficDenied
+          expr: shop:required_denied_packets:window > 0
+          for: {{ .Values.monitoring.network.alerts.deniedFor }}
+          labels:
+            severity: critical
+            service: shop
+          annotations:
+            summary: NetworkPolicy blocks a required shop route
+            description: Calico observed Deny for API/worker to PostgreSQL TCP 5432 or CoreDNS UDP/TCP 53. Inspect Whisker. Values cover an overlapping 120-second window; deliberate stray-Pod denials are excluded.
+
+        - alert: ShopDNSUnhealthy
+          expr: |
+            (shop:coredns_servfail:ratio > {{ .Values.monitoring.network.alerts.dnsServfailRatio }})
+            or (sum(up{job="coredns"}) == 0)
+            or absent(up{job="coredns"})
+          for: {{ .Values.monitoring.network.alerts.dnsFor }}
+          labels:
+            severity: critical
+            service: shop
+          annotations:
+            summary: CoreDNS errors or no scrapeable CoreDNS targets
+            description: SERVFAIL exceeds {{ mulf .Values.monitoring.network.alerts.dnsServfailRatio 100 }} percent of responses, or no CoreDNS metrics target is reachable. Scrape availability alone does not prove DNS access from shop.
+{{- end }}

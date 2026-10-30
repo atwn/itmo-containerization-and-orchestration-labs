@@ -857,3 +857,168 @@ python3 scripts/check-access-matrix.py
 <img src="./scrs/part6-03-recovered-matrix.png" width="100%" alt="Матрица после исправления: разрешения и запреты совпадают с ожиданиями, контроли PASS, RESULT PASS">
 
 </details>
+
+### Часть 7 — Мониторинг сети
+
+Использовали существующий Prometheus/Grafana из лабы 2. В `shop` chart
+добавили [экспортёр и ServiceMonitor](./charts/shop/templates/flow-metrics.yaml),
+[сетевые правила](./charts/shop/templates/network-prometheusrule.yaml)
+и [дашборд Shop — Network policy & DNS](./charts/shop/dashboards/network.json).
+Пороги и длительности заданы в `monitoring.network.alerts`
+[values.yaml](./charts/shop/values.yaml). Существующие RED-алерты сохранены.
+
+#### Источники метрик и проверка сбора
+
+| Что наблюдаем | Источник | Что означает метрика |
+|---|---|---|
+| Соединения | `node_nf_conntrack_entries` и `node_nf_conntrack_entries_limit` существующего node-exporter | Заполнение таблицы отслеживания соединений всей ноды; не только shop и не только TCP |
+| Запрещённый трафик | [flow-metrics](./tools/flow-metrics/README.md), читающий API Whisker v3.30.3 | Агрегированные наблюдения Deny-пакетов за окно 120 секунд, с сохранением reporter Src/Dst; не число уникальных соединений |
+| DNS health | Существующий CoreDNS ServiceMonitor: `up`, `coredns_dns_responses_total`, `coredns_dns_requests_total` | Доступность сбора метрик, запросы и ответы по rcode, включая SERVFAIL |
+
+Экспортёр работает в `obs`, читает потоки с namespace источника `shop`
+каждые 15 секунд и не имеет Kubernetes API token или привилегированного
+доступа к нодам. Отдельные NetworkPolicy разрешают ему DNS и Whisker,
+а Prometheus — сбор метрик экспортёра. Доступ к приложению не расширяли.
+
+Число Deny за скользящее окно — **gauge**, поэтому `rate()` к нему
+не применяем: значение уменьшается при выходе старых событий из окна.
+Ошибка чтения Whisker не превращается в нулевой Deny: экспортёр выставляет
+`collector_success=0`, а метрики данных не публикует. На дашборде отдельно
+видны доступность экспортёра и возраст потоков. Recording rule обязательных
+Deny использует только успешный сбор и данные моложе 180 секунд.
+
+<details>
+<summary>Предустановка</summary>
+
+```bash
+docker build -f Dockerfile.flow-metrics -t ghcr.io/shop-lab/flow-metrics:v1 .
+kind load docker-image ghcr.io/shop-lab/flow-metrics:v1 --name lab5
+helm --kube-context kind-lab5 upgrade shop charts/shop \
+  -n shop --reset-values --wait --timeout 5m
+```
+
+После обнаружения ServiceMonitor и обновления scrape проверили источники
+и загрузку правил через Prometheus на `localhost:9090`:
+
+```bash
+python3 scripts/check-network-monitoring.py
+python3 scripts/check-network-monitoring.py --rules
+```
+
+Дашборд доступен через Grafana: http://localhost:3000/d/shop-network.
+
+</details>
+
+<details>
+<summary>Демонстрация</summary>
+
+Получили метрики conntrack с трёх нод, две доступные цели CoreDNS,
+успешный сбор свежих потоков и нулевой Deny на обязательных связях:
+
+<img src="./scrs/part7-00-metric-sources.png" width="100%" alt="Восемь проверок источников сетевых метрик: PASS">
+
+После загрузки правил все три сетевых алерта имеют `health=ok`, `inactive`:
+
+<img src="./scrs/part7-01-metric-update.png" width="100%" alt="Применение Helm chart и проверка трёх сетевых правил: ok, inactive, PASS">
+
+Исходное состояние дашборда, без активных сетевых алертов.
+На панели `Network alerts` нет рядов, поскольку `ALERTS` публикуются
+для состояний pending/firing; исправность источников проверяем отдельно:
+
+<img src="./scrs/part7-02-grafana-new.png" width="100%" alt="Сетевой дашборд до эксперимента: телеметрия доступна, Deny равен нулю, две цели CoreDNS UP">
+
+</details>
+
+#### Три сетевых алерта и их обоснование
+
+| Алерт | Условие | Обоснование |
+|---|---|---|
+| `ShopConntrackPressure` | Заполнение conntrack >80% в течение 2 минут | Запас до предела таблицы позволяет заметить риск отказа новых отслеживаемых потоков до её переполнения |
+| `ShopRequiredTrafficDenied` | Deny на API/worker → PostgreSQL TCP 5432 или CoreDNS UDP/TCP 53 присутствует в окне минимум 30 секунд | Это нарушение целевой матрицы и необходимой приложению связи; ожидаемые запреты постороннему Pod не включены |
+| `ShopDNSUnhealthy` | SERVFAIL >5% ответов либо нет доступных целей CoreDNS; условие сохраняется 1 минуту | Обнаруживает ошибки DNS-сервера или потерю доступности его метрик; NXDOMAIN показан отдельно и не считается SERVFAIL |
+
+`up=1` подтверждает успешный scrape **Prometheus → CoreDNS:9153**,
+но не проверяет **API → CoreDNS:53**. Запросы, отброшенные политикой
+до CoreDNS, не попадают в его счётчики ответов. Их блокировку обнаруживаем
+по потокам Calico и алерту обязательных связей.
+
+Для правил прошли восемь сценариев [promtool-тестов](./scripts/test-network-rules.py):
+исправное состояние и ожидаемые запреты, задержка срабатывания и восстановление,
+сбой/устаревание телеметрии, SERVFAIL, недоступные и отсутствующие DNS targets.
+
+#### Реальное срабатывание и восстановление
+
+Повторно запустили случайную неисправность. В этом эксперименте скрипт
+исключил API и worker из DNS-разрешения. После перезапуска Pod'ов приложение
+не могло разрешить имя БД: `/health` отвечал `200`, а шесть попыток
+`POST /order` завершились тайм-аутом, итог `DEGRADED`.
+
+```bash
+python3 scripts/hidden-fault.py inject
+python3 scripts/exercise-orders.py --duration 30
+python3 scripts/watch-network-alert.py --expect firing --timeout 240
+```
+
+[Наблюдатель](./scripts/watch-network-alert.py) зафиксировал переход
+`pending → firing`: **30 октября 2026 года в 21:07:31 МСК** значение Deny
+в окне составило **54**, `collector_success=1`, `up=1`, возраст потоков —
+около **16,6 секунды**. Пороги алерта для демонстрации не меняли.
+
+<details>
+<summary>Демонстрация</summary>
+
+Тайм-ауты заказов и подтверждённый `firing` при исправном сборе метрик:
+
+<img src="./scrs/part7-03-alert-firing.png" width="100%" alt="Реальная блокировка DNS приложения: DEGRADED и переход ShopRequiredTrafficDenied из pending в firing">
+
+На дашборде видны рост Deny и сработавший алерт. Позднее значение окна
+достигло 204 пакетов. При этом обе цели CoreDNS оставались UP,
+а SERVFAIL — нулевым: блокировка происходила до доставки DNS-запроса серверу.
+
+<img src="./scrs/part7-04-dashboard.png" width="100%" alt="Дашборд во время неисправности: 204 Deny-пакета в окне и ShopRequiredTrafficDenied firing при двух доступных целях CoreDNS">
+
+</details>
+
+Восстановили сохранённые значения, применили chart и проверили заказы:
+
+```bash
+python3 scripts/hidden-fault.py restore
+python3 scripts/exercise-orders.py --duration 30
+python3 scripts/watch-network-alert.py --expect resolved --timeout 240
+python3 scripts/check-network-monitoring.py --rules
+```
+
+Шесть новых заказов получили `HTTP 201` и `processed=true`, итог `OK`.
+В **21:12:51 МСК** наблюдатель подтвердил `inactive`, **Deny=0**,
+`collector_success=1`, `up=1` и свежесть потоков около **21,4 секунды**.
+Последующая проверка источников и трёх правил завершилась `PASS`.
+Исходный `values.yaml` восстановлен полностью.
+
+У этого правила **нет отдельного cooldown**: `keep_firing_for` не задан
+(в API `keepFiringFor=0`). `for: 30s` задерживает срабатывание, а не снятие
+алерта. После исправления старые Deny могут оставаться в окне 120 секунд;
+также требуется время на агрегацию, scrape и вычисление правил. Когда условие
+перестаёт выполняться, алерт становится inactive на очередной оценке.
+
+Само исчезновение алерта не доказывает восстановление: при сбое сборщика
+recording rule тоже перестаёт выдавать значение. Поэтому проверили вместе
+обработку заказов, нулевой Deny, доступность и свежесть телеметрии.
+Отдельного алерта на потерю экспортёра среди этих трёх правил нет;
+такое состояние видно на панелях доступности и возраста данных.
+
+<details>
+<summary>Демонстрация</summary>
+
+Восстановление заказов, снятие алерта и итоговая проверка метрик:
+
+<img src="./scrs/part7-05-alert-resolved.png" width="100%" alt="Шесть заказов успешно обработаны, алерт inactive, Deny равен нулю, телеметрия исправна, проверки PASS">
+
+Дашборд после восстановления: Deny вернулся к нулю, сбор потоков работает,
+обе цели CoreDNS доступны. В интервале последних 30 минут осталась история
+всплеска Deny и состояний pending/firing; линии алерта заканчиваются после
+восстановления. Значение `Last*` в легенде показывает последнюю точку ряда
+с данными (`lastNotNull`), а не текущее состояние алерта.
+
+<img src="./scrs/part7-06-dashboard-restored.png" width="100%" alt="Дашборд после восстановления: Deny равен нулю, телеметрия доступна, на графиках видны завершившиеся всплеск Deny и срабатывание алерта">
+
+</details>
