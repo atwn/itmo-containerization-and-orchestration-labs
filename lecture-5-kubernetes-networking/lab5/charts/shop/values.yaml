@@ -12,6 +12,10 @@ api:
     port: 80
     targetPort: 8080
   healthFail: false
+  shutdown:
+    # Keep accepting requests while EndpointSlice/kube-proxy converge.
+    preStopSeconds: 5
+    gracePeriodSeconds: 30
   probes:
     liveness:
       initialDelaySeconds: 5

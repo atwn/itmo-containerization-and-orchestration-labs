@@ -23,7 +23,7 @@ kind create cluster \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part0-00.png" width=500>
+<img src="./scrs/part0-00.png" width="500">
 </details>
 
 ---
@@ -62,7 +62,7 @@ kubectl --context kind-lab5 apply \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part0-01.png" width=100%>
+<img src="./scrs/part0-01.png" width="100%">
 </details>
 
 ---
@@ -130,7 +130,7 @@ helm --kube-context kind-lab5 upgrade \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-00-b.png" width=100%>
+<img src="./scrs/part1-00-b.png" width="100%">
 </details>
 
 ---
@@ -153,7 +153,7 @@ helm --kube-context kind-lab5 upgrade \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-01-api.png" width=100%>
+<img src="./scrs/part1-01-api.png" width="100%">
 </details>
 
 ---
@@ -168,7 +168,7 @@ helm --kube-context kind-lab5 upgrade \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-01-worker.png" width=100%>
+<img src="./scrs/part1-01-worker.png" width="100%">
 </details>
 
 ---
@@ -181,7 +181,7 @@ helm --kube-context kind-lab5 upgrade \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-01-node-w1.png" width=100%>
+<img src="./scrs/part1-01-node-w1.png" width="100%">
 </details>
 
 ---
@@ -192,7 +192,7 @@ helm --kube-context kind-lab5 upgrade \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-01-node-w2.png" width=100%>
+<img src="./scrs/part1-01-node-w2.png" width="100%">
 </details>
 
 ---
@@ -205,7 +205,7 @@ helm --kube-context kind-lab5 upgrade \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-01-connection.png" width=100%>
+<img src="./scrs/part1-01-connection.png" width="100%">
 </details>
 
 ### Часть 2 — Докажи непрерывность через хаос подов
@@ -223,12 +223,13 @@ helm --kube-context kind-lab5 --namespace shop \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part2-00.png" width=100%>
+<img src="./scrs/part2-00.png" width="100%">
 </details>
 
 ---
 
 Выводы:
+
 * при наличии NodePort сервис становится доступным извне по IP-адресу ноды
 * NodePort не является внешним LoadBalancer и не предоставляет отдельный внешний адрес,
   а kube-proxy по-прежнему выполняет балансировку между эндпоинтами Service'а
@@ -243,17 +244,22 @@ helm --kube-context kind-lab5 --namespace shop \
 - [`scripts/chaos.sh`](./scripts/chaos.sh) — каждые 5–10 секунд выбирает случайный `api` Pod и удаляет его.
   После удаления Deployment или другой контроллер восстанавливает нужное количество реплик.
 
+Для повторяемого сбора доказательств дополнительно подготовлены
+[`scripts/capture-chaos.py`](./scripts/capture-chaos.py) и
+[`scripts/plot-chaos.py`](./scripts/plot-chaos.py): первый собирает запросы, удаления
+и состояния Kubernetes за общий интервал, второй строит график по сохранённым данным.
+`load.sh` теперь пишет JSON, различает неуспешные HTTP-ответы и ошибки транспорта,
+сохраняет exit code `curl`; клиентские повторы запросов не используются.
+
 Для начального сравнения записали контрольный прогон без удаления Pod'ов. В качестве
 базовых показателей использовали число успешных и неуспешных запросов, а также
 latency. В хаос-тесте дополнительно наблюдали удаления Pod'ов, переходы Pod'ов в
 состояния `Terminating`/`Running`, изменение IP-адресов и состава `EndpointSlice`.
 
-В моменты удаления Pod'ов незначительно менялaсь latency, но ни один запрос не упал.
-
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part2-01-chaos.png" width=100%>
+<img src="./scrs/part2-01-chaos.png" width="100%">
 </details>
 
 ---
@@ -272,10 +278,12 @@ latency. В хаос-тесте дополнительно наблюдали у
 <summary>Демонстрация</summary>
 
 Записи iptables до удаления пода:
-<img src="./scrs/part2-02-iptables-0.png" width=100%>
+
+<img src="./scrs/part2-02-iptables-0.png" width="100%">
 
 Сразу после удаления пода из `shop-api` и до того, как replacement-под был помечен как Ready в EndpointSlice:
-<img src="./scrs/part2-02-iptables-1.png" width=100%>
+
+<img src="./scrs/part2-02-iptables-1.png" width="100%">
 </details>
 
 ---
@@ -295,7 +303,7 @@ latency. В хаос-тесте дополнительно наблюдали у
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part2-02-iptables-lb.png" width=100%>
+<img src="./scrs/part2-02-iptables-lb.png" width="100%">
 </details>
 
 ---
@@ -336,13 +344,84 @@ helm --kube-context kind-lab5 upgrade shop ./charts/shop \
 
 </details>
 
-Получили два графика: один отображает latency по логам из `chaos-load` Pod'а, а другой отслеживает количество активных подов в `api` Deployment'е по метрикам Prometheus.
-На них мы видим как растёт latency во время удаления Pod'ов. При этом, все запросы по-прежнему обрабатываются успешно.
+В [дашборде](./charts/shop/dashboards/shop.json) вывели latency успешных запросов,
+все клиентские попытки и ошибки за минуту, а также доступные реплики Deployment.
+`sum(up{job="api"})` показывает успешность scrape и используется отдельно от
+состояния Pod'ов. Ноль ошибок отображается только при наличии запросов;
+отсутствие трафика остаётся `No data`.
 
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part2-02-chaos-graphana.png" width=100%>
+<img src="./scrs/part2-02-chaos-graphana.png" width="100%">
+</details>
+
+---
+
+#### Итоговый контрольный прогон
+
+Для корректного завершения API настроили `preStop.sleep: 5s` и общий
+`terminationGracePeriodSeconds: 30` в [values.yaml](./charts/shop/values.yaml)
+и [Deployment](./charts/shop/templates/api-deployment.yaml). Во время `preStop`
+API продолжает принимать запросы, пока обновляется маршрутизация; затем
+обрабатывает SIGTERM через `http.Server.Shutdown`. Пауза входит в общий grace period.
+
+<details>
+<summary>Предустановка</summary>
+
+На работающем стенде с Deployment `chaos-load`:
+
+```bash
+LAB5_RUN_DIR="evidence/part2/manual-$(date +%Y%m%d-%H%M%S)"
+python3 scripts/capture-chaos.py "$LAB5_RUN_DIR" \
+  --warmup 30 --chaos 180 --cooldown 30 --rps 5
+```
+
+Сборщик выполняет нагрузку через NodePort, удаляет случайные API Pod'ы
+и сохраняет их IP и состояния EndpointSlice. Логи DNS-запросов к
+`shop-api.shop.svc.cluster.local` собираются за тот же интервал.
+Длительность — четыре минуты, из них три минуты непрерывного хаоса.
+Клиентские повторы запросов не используются.
+
+</details>
+
+Провели контрольный прогон **30 октября 2026 года, 15:06:55–15:10:56 МСК**[^part2-AI].
+За три минуты хаоса удалили 24 API Pod'а; им на замену появились 24 новых Pod'а.
+За весь интервал наблюдали 28 различных Pod IP с учётом четырёх исходных.
+
+| Клиентский путь | Запросы | Ошибки |
+|:--|--:|--:|
+| DNS → ClusterIP | 234 | 0 |
+| NodePort | 1029 | 0 |
+
+Число Ready endpoints менялось от 2 до 4 и восстановилось до 4.
+DNS-генератор не перезапускался. Таким образом, в измеренном интервале
+все 1263 запроса завершились успешно при непрерывной замене Pod'ов.
+
+Артефакты: [параметры прогона](./evidence/part2/manual-20261030-150654/run.json),
+[сводка](./evidence/part2/manual-20261030-150654/summary.json),
+[запросы DNS](./evidence/part2/manual-20261030-150654/dns.jsonl),
+[запросы NodePort](./evidence/part2/manual-20261030-150654/nodeport.jsonl),
+[удаления](./evidence/part2/manual-20261030-150654/deletions.jsonl),
+[Pod'ы и EndpointSlice](./evidence/part2/manual-20261030-150654/snapshots.jsonl).
+
+[^part2-AI]: Сценарий и инструменты сбора доказательств подготовили с помощью AI.
+    При проверке исходных логов обнаружили неуспешный запрос и добавили задержку
+    `preStop`, чтобы снизить риск ошибок во время обновления правил Service.
+
+<details>
+<summary>Демонстрация</summary>
+
+Все клиентские попытки и ошибки, удаления, Ready endpoints и смена Pod IP
+на общей временной шкале. Жёлтым выделен период хаоса.
+
+<img src="./evidence/part2/manual-20261030-150654/continuity.png" width="100%" alt="1263 успешных запроса при 24 удалениях API Pod'ов">
+
+В Grafana показан более широкий интервал, включающий итоговый прогон:
+клиентская нагрузка сохраняется, а число ошибок остаётся нулевым.
+
+<img src="./scrs/part2-03-manual-grafana.png" width="100%" alt="Grafana: клиентские запросы, ошибки и доступность API во время хаоса">
+
 </details>
 
 ---
@@ -382,10 +461,14 @@ Service не является самим Pod'ом. Это стабильная �
 состояние соответствующего endpoint. В частности, `conditions.ready` становится
 `false` либо endpoint исключается из списка готовых backend'ов. `kube-proxy` следит
 за Service и EndpointSlice и обновляет dataplane ноды — в нашем случае правила
-Service-маршрутизации в iptables. Поэтому новые запросы не должны направляться на
-неготовый Pod.
+Service/DNAT в iptables. Обновление этих правил и отправка SIGTERM контейнеру
+происходят асинхронно: приложение может уже закрыть listener, пока старое правило
+ещё направляет новые соединения на его endpoint. Поэтому даже при наличии трёх
+здоровых реплик отдельный запрос может завершиться ошибкой. Задержка `preStop`
+оставляет API принимающим запросы на время распространения обновлений.
 
-После этого Deployment создаёт новый Pod. Новый Pod обычно получает другой IP-адрес,
+Контроллер ReplicaSet, которым управляет Deployment, создаёт замену удалённому
+Pod'у. Новый Pod обычно получает другой IP-адрес,
 поэтому EndpointSlice изменяется дважды: старый endpoint удаляется или помечается
 как недоступный, а новый добавляется после прохождения readiness probe. Именно
 поэтому в ходе эксперимента важно было наблюдать не только список Pod'ов, но и
@@ -416,10 +499,12 @@ kube-proxy. При удалении или потере readiness Pod исклю
 В этом кластере kube-proxy работает в режиме `iptables`. На это указывают
 цепочки `KUBE-SERVICES`, `KUBE-SVC-*` и `KUBE-SEP-*`, наблюдаемые в таблице
 `nat`. Режим работы также можно проверить, посмотрев конфигурацию соответствующего ConfigMap:
-```bash
-kubectl -n kube-system get cm kube-proxy -o yaml | yq -C '.data."config.conf" | from_yaml | .mode'
-iptables
-```
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part2-00-kubeproxy-mode.png" width="100%">
+</details>
 
 В режиме iptables kube-proxy реализует выбор endpoint'а цепочкой правил
 NAT. В режиме IPVS Service'ы и endpoint'ы представлены как виртуальные

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
-set -u
+set -euo pipefail
 
 KUBE_CONTEXT="${KUBE_CONTEXT:-kind-lab5}"
 NAMESPACE="${NAMESPACE:-shop}"
+DURATION_SECONDS="${DURATION_SECONDS:-0}"
+[[ "$DURATION_SECONDS" =~ ^[0-9]+$ ]] || exit 2
 
 stop_chaos() {
-  printf '\nChaos stopped\n'
+  printf '\nChaos stopped\n' >&2
   exit 130
 }
 
@@ -15,36 +17,29 @@ trap stop_chaos INT TERM
 workload="api"
 
 while true; do
-  # only kill 'api' for now
-  #if (( RANDOM % 2 == 0 )); then
-  #  workload="api"
-  #else
-  #  workload="worker"
-  #fi
+  if ((DURATION_SECONDS > 0 && SECONDS >= DURATION_SECONDS)); then
+    break
+  fi
 
-  mapfile -t pods < <(
-    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get pods \
-      -l "app.kubernetes.io/name=$workload" \
-      --field-selector=status.phase=Running \
-      -o name
-  )
+  candidates=$(kubectl --context "$KUBE_CONTEXT" --request-timeout=10s -n "$NAMESPACE" get pods \
+    -l "app.kubernetes.io/name=$workload,app.kubernetes.io/instance=shop" -o json)
+  mapfile -t pods < <(jq -r '.items[] | select(.metadata.deletionTimestamp == null) |
+    select(any(.status.conditions[]?; .type == "Ready" and .status == "True")) |
+    [.metadata.name, .status.podIP, .spec.nodeName] | @tsv' <<< "$candidates")
 
   if ((${#pods[@]} == 0)); then
-    printf '%s no Running %s pod found; retrying\n' "$(date -Is)" "$workload"
+    printf '%s no Ready %s pod found; retrying\n' "$(date -Is)" "$workload" >&2
     sleep 5
     continue
   fi
 
-  pod="${pods[RANDOM % ${#pods[@]}]}"
-  node=$(kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get "$pod" \
-    -o jsonpath='{.spec.nodeName}')
-  ip=$(kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get "$pod" \
-    -o jsonpath='{.status.podIP}')
+  IFS=$'\t' read -r pod ip node <<< "${pods[RANDOM % ${#pods[@]}]}"
+  ts=$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)
 
-  printf '%s deleting %s ip=%s node=%s\n' \
-    "$(date -Is)" "$pod" "${ip:-<unknown>}" "$node"
-
-  kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" delete "$pod" --wait=false
+  kubectl --context "$KUBE_CONTEXT" --request-timeout=10s -n "$NAMESPACE" \
+    delete pod "$pod" --wait=false >&2
+  printf '{"ts":"%s","event":"delete","pod":"%s","ip":"%s","node":"%s"}\n' \
+    "$ts" "$pod" "$ip" "$node"
 
   sleep $((RANDOM % 6 + 5))
 done
