@@ -516,3 +516,100 @@ NAT. В режиме IPVS Service'ы и endpoint'ы представлены к�
 поддерживать длинные цепочки правил, а IPVS использует отдельные структуры
 ядра для поиска backend'а. В нашем эксперименте наблюдается
 именно изменение iptables-правил после обновления EndpointSlice.
+
+### Часть 3 — Спроектируй целевую матрицу доступа
+
+До введения ограничений проверили доступ постороннего Pod'а к PostgreSQL.
+В namespace `shop` Kubernetes NetworkPolicy отсутствовали. Pod с label
+`app.kubernetes.io/name=matrix-probe`, без labels API/worker, получил ответ БД.
+
+<details>
+<summary>Предустановка</summary>
+
+```bash
+k() { kubectl --context kind-lab5 -n shop "$@"; }
+LAB5_PROBE="matrix-probe-$(date +%s)"
+LAB5_PG_IMAGE=$(k get pods -l cnpg.io/cluster=shop-postgres \
+  -o jsonpath='{.items[0].spec.containers[?(@.name=="postgres")].image}')
+
+k run "$LAB5_PROBE" --image="$LAB5_PG_IMAGE" \
+  --image-pull-policy=IfNotPresent --restart=Never \
+  --labels='app.kubernetes.io/name=matrix-probe' --command -- sleep 600
+k wait --for=condition=Ready "pod/$LAB5_PROBE" --timeout=120s
+
+# Исходные политики, идентичность клиента и результат подключения.
+k get networkpolicy
+k get pod "$LAB5_PROBE" -o wide --show-labels
+k exec "$LAB5_PROBE" -- pg_isready -h shop-postgres-rw -p 5432 -t 3
+printf 'Exit code: %s\n' "$?"
+
+# После проверки удаляем временный Pod.
+k delete pod "$LAB5_PROBE" --wait=false
+```
+
+Для временного Pod используем образ текущей БД, содержащий `pg_isready`.
+Пароль БД для этой проверки не используется.
+
+</details>
+
+<details>
+<summary>Демонстрация</summary>
+
+Получили `accepting connections`: PostgreSQL доступен по сети
+из постороннего Pod'а. Эта проверка не подтверждает право читать данные.
+
+<img src="./scrs/part3-00-baseline.png" width="100%" alt="До применения NetworkPolicy: посторонний Pod matrix-probe подключается к PostgreSQL">
+
+</details>
+
+#### Целевая матрица
+
+Выбрали default-deny для ingress и egress Pod'ов namespace `shop`.
+Матрица описывает новые соединения; ответный трафик разрешённых соединений
+пропускается автоматически. Состояние «разрешено» ниже — проектное требование,
+которое проверим после применения политик.
+
+| Источник | Назначение | Протокол / порт назначения | Решение |
+|:--|:--|:--|:--|
+| Клиент стенда через NodePort | API | TCP: NodePort `32590` → Pod `8080` | Разрешить |
+| `chaos-load` | API | TCP: Service `80` → Pod `8080` | Разрешить |
+| API | PostgreSQL | TCP `5432` | Разрешить |
+| worker | PostgreSQL | TCP `5432` | Разрешить |
+| API | worker | Любой | Запретить |
+| worker | API | Любой | Запретить |
+| `chaos-load` | worker, PostgreSQL | Любой | Запретить |
+| Посторонний Pod | API, worker, PostgreSQL | Любой | Запретить |
+| API, worker, PostgreSQL, `chaos-load` | CoreDNS | UDP и TCP `53` | Разрешить |
+| Prometheus из `obs` | API, worker | TCP `8080` | Разрешить |
+| Оператор CNPG из `cnpg-system` | PostgreSQL | TCP `8000`, `5432` | Разрешить |
+| Instance manager в Pod PostgreSQL | Kubernetes API | TCP: Service `443` → endpoint `6443` | Разрешить |
+| Pod'ы `shop` | Интернет и остальные направления | Любой | Запретить |
+
+Последняя строка относится к направлениям, не перечисленным в разрешениях.
+Прямой обмен между API и worker не нужен: API записывает заказы в PostgreSQL,
+а worker асинхронно забирает их из БД. DNS разрешаем отдельно: разрешение TCP
+`5432` не позволяет отправить DNS-запрос для определения адреса Service.
+
+Служебные связи CNPG нужны для управления БД и обращения instance manager
+к Kubernetes API. В текущем стенде одна PostgreSQL-реплика; межподовая
+репликация не требуется. Требования оператора описаны в
+[документации CNPG](https://cloudnative-pg.io/docs/1.26/networking/).
+
+#### Идентификация участников
+
+Используем namespace и устойчивые labels вместо Pod IP:
+
+| Участник | Namespace | Labels |
+|:--|:--|:--|
+| API / worker | `shop` | `app.kubernetes.io/instance=shop` и `app.kubernetes.io/name=api` / `worker` |
+| PostgreSQL | `shop` | `cnpg.io/cluster=shop-postgres` |
+| Генератор нагрузки | `shop` | `app.kubernetes.io/name=chaos-load` |
+| CoreDNS | `kube-system` | `k8s-app=kube-dns` |
+| Prometheus | `obs` | `app.kubernetes.io/name=prometheus`, `prometheus=kps-prometheus` |
+| Оператор CNPG | `cnpg-system` | `app.kubernetes.io/name=cloudnative-pg`, `app.kubernetes.io/instance=cnpg` |
+
+У Pod PostgreSQL `app.kubernetes.io/instance=shop-postgres`, поэтому общий
+селектор `instance=shop` его не выбирает. Для внешнего клиента через NodePort
+учитываем адрес источника после NAT; pod labels к нему неприменимы.
+NetworkPolicy ограничивает IP и порты, поэтому доступ Prometheus к `8080`
+не ограничивается HTTP-путём `/metrics`.
