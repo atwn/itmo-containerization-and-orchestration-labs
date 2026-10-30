@@ -12,6 +12,10 @@ api:
     port: 80
     targetPort: 8080
   healthFail: false
+  shutdown:
+    # Keep accepting requests while EndpointSlice/kube-proxy converge.
+    preStopSeconds: 5
+    gracePeriodSeconds: 30
   probes:
     liveness:
       initialDelaySeconds: 5
@@ -60,6 +64,20 @@ containerSecurityContext:
   allowPrivilegeEscalation: false
 monitoring:
   enabled: true
+  network:
+    enabled: true
+    namespace: obs
+    calicoNamespace: calico-system
+    whiskerPort: 8081
+    image: ghcr.io/shop-lab/flow-metrics:v1
+    imagePullPolicy: Never
+    whiskerURL: http://whisker.calico-system.svc.cluster.local:8081/whisker-backend/flows
+    alerts:
+      conntrackUsageRatio: 0.8
+      conntrackFor: 2m
+      deniedFor: 30s
+      dnsServfailRatio: 0.05
+      dnsFor: 1m
   interval: 15s
   scrapeTimeout: 5s
   dashboard:
@@ -87,3 +105,170 @@ postgres:
     limits:
       cpu: 500m
       memory: 512Mi
+
+# Labels and IPs below describe the kind-lab5 / shop installation.
+# NetworkPolicy permissions are additive; their order is not a priority.
+networkPolicy:
+  enabled: true
+  policies:
+    app-to-postgres:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/instance: shop
+        matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values: [api, worker]
+      policyTypes: [Egress]
+      egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  cnpg.io/cluster: shop-postgres
+          ports:
+            - protocol: TCP
+              port: 5432
+
+    postgres-from-app:
+      podSelector:
+        matchLabels:
+          cnpg.io/cluster: shop-postgres
+      policyTypes: [Ingress]
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: shop
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values: [api, worker]
+          ports:
+            - protocol: TCP
+              port: 5432
+
+    dns:
+      podSelector:
+        matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values: [api, worker, postgres, chaos-load]
+      policyTypes: [Egress]
+      egress:
+        - to:
+            # Both selectors in one peer: namespace AND Pod identity.
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: kube-system
+              podSelector:
+                matchLabels:
+                  k8s-app: kube-dns
+          ports:
+            - protocol: UDP
+              port: 53
+            - protocol: TCP
+              port: 53
+
+    load-to-api:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: chaos-load
+      policyTypes: [Egress]
+      egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: shop
+                  app.kubernetes.io/name: api
+          ports:
+            # Destination Pod port after Service DNAT, not Service port 80.
+            - protocol: TCP
+              port: 8080
+
+    api-from-clients:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/instance: shop
+          app.kubernetes.io/name: api
+      policyTypes: [Ingress]
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: chaos-load
+            # Host client and possible NodePort SNAT addresses in kind-lab5.
+            # Keep these /32s outside the Pod CIDR; do not allow 0.0.0.0/0.
+            - ipBlock:
+                cidr: 172.18.0.1/32
+            - ipBlock:
+                cidr: 172.18.0.2/32
+            - ipBlock:
+                cidr: 172.18.0.3/32
+            - ipBlock:
+                cidr: 172.18.0.4/32
+          ports:
+            - protocol: TCP
+              port: 8080
+
+    metrics-from-prometheus:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/instance: shop
+        matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values: [api, worker]
+      policyTypes: [Ingress]
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: obs
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: prometheus
+                  prometheus: kps-prometheus
+          ports:
+            # L3/L4 policy allows the port, not only the /metrics path.
+            - protocol: TCP
+              port: 8080
+
+    postgres-from-operator:
+      podSelector:
+        matchLabels:
+          cnpg.io/cluster: shop-postgres
+      policyTypes: [Ingress]
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: cnpg-system
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: cloudnative-pg
+                  app.kubernetes.io/instance: cnpg
+          ports:
+            - protocol: TCP
+              port: 8000
+            - protocol: TCP
+              port: 5432
+
+    postgres-to-kube-api:
+      podSelector:
+        matchLabels:
+          cnpg.io/cluster: shop-postgres
+      policyTypes: [Egress]
+      egress:
+        # Account for the Kubernetes API Service before/after DNAT.
+        - to:
+            - ipBlock:
+                cidr: 10.96.0.1/32
+          ports:
+            - protocol: TCP
+              port: 443
+        - to:
+            - ipBlock:
+                cidr: 172.18.0.2/32
+          ports:
+            - protocol: TCP
+              port: 6443

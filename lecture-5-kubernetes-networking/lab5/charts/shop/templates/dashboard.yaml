@@ -11,4 +11,8 @@ metadata:
 data:
   shop.json: |-
 {{ .Files.Get "dashboards/shop.json" | indent 4 }}
+{{- if .Values.monitoring.network.enabled }}
+  network.json: |-
+{{ .Files.Get "dashboards/network.json" | indent 4 }}
+{{- end }}
 {{- end }}

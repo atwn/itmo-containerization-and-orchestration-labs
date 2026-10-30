@@ -13,7 +13,7 @@ if [[ "$MODE" == "--once" ]]; then
 fi
 
 usage() {
-  printf 'Usage: %s {pods|entrypointslices}\n' "$0" >&2
+  printf 'Usage: %s {pods|endpointslices|iptables}\n' "$0" >&2
   exit 2
 }
 
@@ -23,50 +23,100 @@ command -v yq >/dev/null 2>&1 || {
 }
 
 watch_pods() {
-  kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get pods \
-    -l 'app.kubernetes.io/name in (api,worker)' \
-    -o yaml |
-    yq -r '
-      (["POD", "WORKLOAD", "PHASE", "READY", "POD_IP", "NODE", "RESTARTS", "DELETION"] | @tsv),
-      (.items | sort_by(.metadata.name)[] |
-        ([
-          .metadata.name,
-          .metadata.labels["app.kubernetes.io/name"],
-          .status.phase,
-          ([.status.conditions[]? | select(.type == "Ready") | .status] | first // "-"),
-          (.status.podIP // "-"),
-          (.spec.nodeName // "-"),
-          ([.status.containerStatuses[]?.restartCount] | add // 0),
-          (if .metadata.deletionTimestamp then "terminating" else "-" end)
-        ] | @tsv)
-      )
-    ' | column -t
+  {
+    printf '%s\n' $'POD\tWORKLOAD\tPHASE\tREADY\tPOD_IP\tNODE\tRESTARTS\tDELETION'
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get pods \
+      -l 'app.kubernetes.io/name in (api,worker)' \
+      -o yaml |
+      yq -r '
+        (.items | sort_by(.metadata.name)[] |
+          ([
+            .metadata.name,
+            .metadata.labels["app.kubernetes.io/name"],
+            .status.phase,
+            ([.status.conditions[]? | select(.type == "Ready") | .status] | .[0] // "-"),
+            (.status.podIP // "-"),
+            (.spec.nodeName // "-"),
+            (.status.containerStatuses[0].restartCount // 0),
+            (if .metadata.deletionTimestamp then "terminating" else "-" end)
+          ] | @tsv)
+        )
+      '
+  } | column -t
 }
 
-watch_entrypointslices() {
-  kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get endpointslice \
-    -l 'kubernetes.io/service-name in (shop-api,shop-worker)' \
-    -o yaml |
-    yq -r '
-      (["SLICE", "ADDRESSES", "READY", "SERVING", "TERMINATING", "POD", "NODE"] | @tsv),
-      (.items[] as $slice |
-        $slice.endpoints[] |
-        ([
-          $slice.metadata.name,
-          (.addresses | join(",")),
-          (if .conditions.ready == null then "unset" else (.conditions.ready | tostring) end),
-          (if .conditions.serving == null then "unset" else (.conditions.serving | tostring) end),
-          (if .conditions.terminating == null then "unset" else (.conditions.terminating | tostring) end),
-          (.targetRef.name // "-"),
-          (.nodeName // "-")
-        ] | @tsv)
-      )
-    ' | column -t
+watch_endpointslices() {
+  {
+    printf '%s\n' $'SLICE\tADDRESSES\tREADY\tSERVING\tTERMINATING\tPOD\tNODE'
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get endpointslice \
+      -l 'kubernetes.io/service-name in (shop-api,shop-worker)' \
+      -o yaml |
+      yq -r '
+        (.items[] as $slice |
+          $slice.endpoints[] |
+          ([
+            $slice.metadata.name,
+            (.addresses | join(",")),
+            (if .conditions.ready == null then "unset" else (.conditions.ready | tostring) end),
+            (if .conditions.serving == null then "unset" else (.conditions.serving | tostring) end),
+            (if .conditions.terminating == null then "unset" else (.conditions.terminating | tostring) end),
+            (.targetRef.name // "-"),
+            (.nodeName // "-")
+          ] | @tsv)
+        )
+      '
+  } | column -t
+}
+
+watch_iptables() {
+  command -v docker >/dev/null 2>&1 || {
+    printf 'error: docker is required for iptables mode\n' >&2
+    return 1
+  }
+
+  local cluster_ip
+  local node
+  local endpoint_ip
+  local endpoint_ips
+
+  cluster_ip=$(kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" \
+    get svc shop-api -o jsonpath='{.spec.clusterIP}')
+
+  mapfile -t endpoint_ips < <(
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get endpointslice \
+      -l 'kubernetes.io/service-name=shop-api' -o yaml |
+      yq -r '.items[].endpoints[]?.addresses[]?' | sort -u
+  )
+
+  printf 'SERVICE: shop-api  CLUSTER-IP: %s\n' "$cluster_ip"
+  printf 'ENDPOINTS: '
+  if ((${#endpoint_ips[@]} == 0)); then
+    printf '%s\n' '(none)'
+  else
+    printf '%s\n' "${endpoint_ips[*]}"
+  fi
+
+  for node in $(kubectl --context "$KUBE_CONTEXT" get nodes \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
+    printf '\nNODE: %s\n' "$node"
+    printf '  Service and endpoint NAT rules:\n'
+
+    docker exec "$node" sh -c 'iptables-save -t nat' |
+      grep -F -- "$cluster_ip" |
+      sed -E 's/ -m comment --comment "[^"]*"//g; s/^-A /  /' || true
+
+    for endpoint_ip in "${endpoint_ips[@]}"; do
+      docker exec "$node" sh -c 'iptables-save -t nat' |
+        grep -F -- "$endpoint_ip" |
+        sed -E 's/ -m comment --comment "[^"]*"//g; s/^-A /  /' || true
+    done
+  done
 }
 
 case "$MODE" in
   pods) watch_function=watch_pods ;;
-  entrypointslices) watch_function=watch_entrypointslices ;;
+  endpointslices) watch_function=watch_endpointslices ;;
+  iptables) watch_function=watch_iptables ;;
   *) usage ;;
 esac
 

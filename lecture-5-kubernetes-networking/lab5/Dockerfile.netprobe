@@ -1,0 +1,9 @@
+FROM golang:1.22-alpine AS build
+WORKDIR /probe
+COPY tools/netprobe/ ./
+RUN GO111MODULE=off CGO_ENABLED=0 go test -v . \
+    && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /netprobe main.go
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /netprobe /netprobe
+ENTRYPOINT ["/netprobe"]

@@ -2,8 +2,8 @@
 
 ### Стенд
 
-| Компонент | Конфигурация |
-| --- | --- |
+| Компонент | Конфигурация  |
+|:---------:|:--------------|
 | Хост | Debian GNU/Linux 13.7 (trixie), 8 vCPU, 15 GiB RAM, 3.1 GiB swap |
 | Кластер | kind v0.27.0, Kubernetes 1.33.1, 1 control-plane + 2 worker-ноды |
 | Конфигурация kind | `disableDefaultCNI: true`; pod CIDR `10.244.0.0/16`; service CIDR `10.96.0.0/12` |
@@ -23,7 +23,7 @@ kind create cluster \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part0-00.png" width=500>
+<img src="./scrs/part0-00.png" width="500">
 </details>
 
 ---
@@ -62,7 +62,7 @@ kubectl --context kind-lab5 apply \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part0-01.png" width=100%>
+<img src="./scrs/part0-01.png" width="100%">
 </details>
 
 ---
@@ -130,7 +130,7 @@ helm --kube-context kind-lab5 upgrade \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-00-b.png" width=100%>
+<img src="./scrs/part1-00-b.png" width="100%">
 </details>
 
 ---
@@ -144,66 +144,68 @@ helm --kube-context kind-lab5 upgrade \
 (ситуация вполне типичная и для продуктового окружения).
 
 Внутри `api` pod'а на ноде `lab5-worker`:
-* `if19` - veth на ноде, к которому "подключен" сетевой интерфейс pod'а
+* `eth0@if19` - интерфейс Pod, соединённый с peer veth-интерфейсом с ifindex 19 на ноде
 * `10.244.219.204` - ip адрес виртуального NIC pod'а из пула адресов Calico, совпадает с адресом pod'а на ноде
 * `/32` - маска подсети, означает что адрес один, а значит маршрут проходит через виртуальный next-hop
-* `169.254.1.1` - link-local адрес, означает что маршрутизация осуществляется через Calica контроллер на ноде
+* `169.254.1.1` - виртуальный next-hop, используемый dataplane Calico/Felix для маршрутизации трафика из pod'а
 * `10.96.0.10` - ClusterIP CoreDNS кластера, т.е. разрешение имён происходит внутри кластера
 
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-01-api.png" width=100%>
+<img src="./scrs/part1-01-api.png" width="100%">
 </details>
 
 ---
 
 Внутри `worker` pod'а на ноде `lab5-worker-2`:
-* `if16` - veth на ноде, к которому "подключен" сетевой интерфейс pod'а
+* `eth0@if16` - интерфейс Pod, соединённый с peer veth-интерфейсом с ifindex 16 на ноде
 * `10.244.124.73` - ip адрес виртуального NIC pod'а из пула адресов Calico, совпадает с адресом pod'а на ноде
 * `/32` - маска подсети, означает что адрес один, а значит маршрут проходит через виртуальный next-hop
-* `169.254.1.1` - link-local адрес, означает что маршрутизация осуществляется через Calica контроллер на ноде
+* `169.254.1.1` - виртуальный next-hop, используемый dataplane Calico/Felix для маршрутизации трафика из pod'а
 * `10.96.0.10` - ClusterIP CoreDNS кластера, т.е. разрешение имён происходит внутри кластера
 
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-01-worker.png" width=100%>
+<img src="./scrs/part1-01-worker.png" width="100%">
 </details>
 
 ---
 
 ##### 2. Связь pod-интерфейса с veth на ноде
 
-ifindex 19 `api` pod'a соответствует veth интерфейсу под соответствующим номером на `lab5-worker` ноде.
+`eth0@if19` означает, что интерфейс Pod соединён с peer veth-интерфейсом
+с ifindex 19 на ноде `lab5-worker`. Сам интерфейс `eth0` внутри Pod имеет собственный ifindex.
 
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-01-node-w1.png" width=100%>
+<img src="./scrs/part1-01-node-w1.png" width="100%">
 </details>
 
 ---
 
-ifindex 16 `worker` pod'a соответствует veth интерфейсу под соответствующим номером на `lab5-worker2` ноде.
+`eth0@if16` означает, что интерфейс Pod соединён с peer veth-интерфейсом
+с ifindex 16 на ноде `lab5-worker2`. Сам интерфейс `eth0` внутри Pod имеет собственный ifindex.
 
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-01-node-w2.png" width=100%>
+<img src="./scrs/part1-01-node-w2.png" width="100%">
 </details>
 
 ---
 
 ##### 3. Межнодовый трафик
 
-Поробовали достучаться из pod'a `api` в pod `worker` по IP и по DNS-имени.
+Попробовали достучаться из pod'a `api` в pod `worker` по IP и по DNS-имени.
 Для демонстрации выбрали pod'ы, расположенные на двух разных нодах.
 
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part1-01-connection.png" width=100%>
+<img src="./scrs/part1-01-connection.png" width="100%">
 </details>
 
 ### Часть 2 — Докажи непрерывность через хаос подов
@@ -221,14 +223,16 @@ helm --kube-context kind-lab5 --namespace shop \
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part2-00.png" width=100%>
+<img src="./scrs/part2-00.png" width="100%">
 </details>
 
 ---
 
 Выводы:
+
 * при наличии NodePort сервис становится доступным извне по IP-адресу ноды
-* NodePort не обеспечивает балансировку
+* NodePort не является внешним LoadBalancer и не предоставляет отдельный внешний адрес,
+  а kube-proxy по-прежнему выполняет балансировку между эндпоинтами Service'а
 
 #### Запуск хаос-теста
 
@@ -236,12 +240,16 @@ helm --kube-context kind-lab5 --namespace shop \
 
 - [`scripts/load.sh`](./scripts/load.sh) — генерирует запросы к `/health` с заданным
   количеством запросов в секунду и выводит результат, HTTP-статус и latency;
-- [`scripts/watch.sh`](./scripts/watch.sh) — показывает состояние Pod'ов либо
-  `EndpointSlice` в режиме обновления раз в секунду;
-- [`scripts/chaos.sh`](./scripts/chaos.sh) — каждые 5–10 секунд выбирает случайный
-  `api` Pod и удаляет его. В скрипте также оставлен вариант выбора между `api` и
-  `worker`; его можно включить для расширения эксперимента. После удаления
-  Deployment или другой контроллер восстанавливает нужное количество реплик.
+- [`scripts/watch.sh`](./scripts/watch.sh) — показывает состояние Pod'ов либо `EndpointSlice` в режиме обновления раз в секунду;
+- [`scripts/chaos.sh`](./scripts/chaos.sh) — каждые 5–10 секунд выбирает случайный `api` Pod и удаляет его.
+  После удаления Deployment или другой контроллер восстанавливает нужное количество реплик.
+
+Для повторяемого сбора доказательств дополнительно подготовлены
+[`scripts/capture-chaos.py`](./scripts/capture-chaos.py) и
+[`scripts/plot-chaos.py`](./scripts/plot-chaos.py): первый собирает запросы, удаления
+и состояния Kubernetes за общий интервал, второй строит график по сохранённым данным.
+`load.sh` теперь пишет JSON, различает неуспешные HTTP-ответы и ошибки транспорта,
+сохраняет exit code `curl`; клиентские повторы запросов не используются.
 
 Для начального сравнения записали контрольный прогон без удаления Pod'ов. В качестве
 базовых показателей использовали число успешных и неуспешных запросов, а также
@@ -251,17 +259,165 @@ latency. В хаос-тесте дополнительно наблюдали у
 <details>
 <summary>Демонстрация</summary>
 
-<img src="./scrs/part2-01-chaos.png" width=100%>
+<img src="./scrs/part2-01-chaos.png" width="100%">
 </details>
 
 ---
 
-Для визуального сравнения показателей latency в моменты удаления подов планируем
-построить граф при помощи Grafana + Alloy + Loki. Для этого необходимо поместить
-генератор трафика в дополнительный под на кластере чтобы Alloy смогу спарсить логи.
-Также мы сможем проверить DNS внутри кластера, а не дёргать `api`-сервис по IP ноды и NodePort.
+Мы также понаблюдали за тем, как меняются NAT-правила в iptables при удалении одного или нескольких Pod'ов.
+Для демонстрации добавили ещё один режим в [watch.sh](./scripts/watch.sh): `./scripts/watch.sh iptables`,
+который собирает все записи NAT-правил из iptables по нодам для конкретного ClusterIP (`10.98.161.229`)
+и выводит с структурированном виде на экран.
 
-**(to be continued...)**
+Из интересного: после обновления EndpointSlice kube-proxy удаляет или перестраивает
+соответствующую endpoint-ветку `KUBE-SEP` в iptables,
+но и меняются коэффициенты между оставшимися правилами, что обеспечивает равномерное распределение трафика
+пока число активных подов меньше заданного.
+
+<details>
+<summary>Демонстрация</summary>
+
+Записи iptables до удаления пода:
+
+<img src="./scrs/part2-02-iptables-0.png" width="100%">
+
+Сразу после удаления пода из `shop-api` и до того, как replacement-под был помечен как Ready в EndpointSlice:
+
+<img src="./scrs/part2-02-iptables-1.png" width="100%">
+</details>
+
+---
+
+Ещё один интересный факт, который мы зафиксировали: при обращении к эндпоинту по IP-адресу ноды и NodePort,
+балансировка происходит не только между эндпоинтами данной конкретной ноды — запрос может попасть и на другие ноды.
+Вызвано это, скорее всего, тем, что NAT-правила для каждого сервиса транслируются одинаково на все ноды,
+т.е. каждая нода имеет полный набор правил для ClusterIP сервиса, а не только для своих подов
+(это можно было увидеть на предыдущей демонстрации, см. [part2-02-iptables-0.png](./scrs/part2-02-iptables-0.png)).
+Таким образом, запрос, приходящий на ноду, может быть перенаправлен по внутреннему IP-адресу пода, расположенному на другой ноде.
+Такое поведение показалось нам неочевидным.
+
+Ниже приведён пример распределения трафика между нодами после трёх вызовов `curl -w "\n" -i http://172.18.0.3:32590/health`,
+где `172.18.0.3` - это внешний IP-адрес ноды `lab5-worker` нашего kind-кластера.
+Тот факт, что запрос приходит на разные ноды можно отследить по *rule counters*:
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part2-02-iptables-lb.png" width="100%">
+</details>
+
+---
+
+Для визуального сравнения показателей latency в моменты удаления подов решили
+построить граф при помощи Grafana + Alloy + Loki.
+Для этого поместили генератор трафика в дополнительный под на кластере,
+чтобы Alloy смог спарсить логи (см. [load-generator.yaml](./deploy/load-generator.yaml)).
+Это также позволило нам задействовать CoreDNS внутри кластера,
+а не дёргать `api`-сервис по IP ноды и NodePort, как мы это делали в предыдущем эксперименте.
+CoreDNS разрешает имя Service в его ClusterIP. Дальнейший выбор endpoint и DNAT
+выполняет kube-proxy; выбранный Pod может находиться на локальной или удалённой ноде.
+
+<details>
+<summary>Предустановка</summary>
+
+```bash
+# install Loki
+helm --kube-context kind-lab5 upgrade --install loki grafana/loki \
+  --namespace obs --create-namespace \
+  -f deploy/loki.yaml \
+  --wait --timeout 15m
+
+# install Alloy
+helm --kube-context kind-lab5 upgrade --install alloy grafana/alloy \
+  --namespace obs --create-namespace \
+  -f deploy/alloy.yaml \
+  --wait --timeout 10m
+
+# refresh Grafana dashboards
+helm --kube-context kind-lab5 upgrade shop ./charts/shop \
+  --namespace shop \
+  --reuse-values
+
+# start port-forwarding
+./scripts/port-forward.sh start
+```
+
+</details>
+
+В [дашборде](./charts/shop/dashboards/shop.json) вывели latency успешных запросов,
+все клиентские попытки и ошибки за минуту, а также доступные реплики Deployment.
+`sum(up{job="api"})` показывает успешность scrape и используется отдельно от
+состояния Pod'ов. Ноль ошибок отображается только при наличии запросов;
+отсутствие трафика остаётся `No data`.
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part2-02-chaos-graphana.png" width="100%">
+</details>
+
+---
+
+#### Итоговый контрольный прогон
+
+Для корректного завершения API настроили `preStop.sleep: 5s` и общий
+`terminationGracePeriodSeconds: 30` в [values.yaml](./charts/shop/values.yaml)
+и [Deployment](./charts/shop/templates/api-deployment.yaml). Во время `preStop`
+API продолжает принимать запросы, пока обновляется маршрутизация; затем
+обрабатывает SIGTERM через `http.Server.Shutdown`. Пауза входит в общий grace period.
+
+<details>
+<summary>Предустановка</summary>
+
+На работающем стенде с Deployment `chaos-load`:
+
+```bash
+LAB5_RUN_DIR="evidence/part2/manual-$(date +%Y%m%d-%H%M%S)"
+python3 scripts/capture-chaos.py "$LAB5_RUN_DIR" \
+  --warmup 30 --chaos 180 --cooldown 30 --rps 5
+```
+
+Сборщик выполняет нагрузку через NodePort, удаляет случайные API Pod'ы
+и сохраняет их IP и состояния EndpointSlice. Логи DNS-запросов к
+`shop-api.shop.svc.cluster.local` собираются за тот же интервал.
+Длительность — четыре минуты, из них три минуты непрерывного хаоса.
+Клиентские повторы запросов не используются.
+
+</details>
+
+Провели контрольный прогон **30 октября 2026 года, 15:06:55–15:10:56 МСК**[^part2-AI].
+За три минуты хаоса удалили 24 API Pod'а; им на замену появились 24 новых Pod'а.
+За весь интервал наблюдали 28 различных Pod IP с учётом четырёх исходных.
+
+| Клиентский путь | Запросы | Ошибки |
+|:--|--:|--:|
+| DNS → ClusterIP | 234 | 0 |
+| NodePort | 1029 | 0 |
+
+Число Ready endpoints менялось от 2 до 4 и восстановилось до 4.
+DNS-генератор не перезапускался. Таким образом, в измеренном интервале
+все 1263 запроса завершились успешно при непрерывной замене Pod'ов.
+
+[^part2-AI]: Сценарий и инструменты сбора доказательств подготовили с помощью AI.
+    При проверке исходных логов обнаружили неуспешный запрос и добавили задержку
+    `preStop`, чтобы снизить риск ошибок во время обновления правил Service.
+
+<details>
+<summary>Демонстрация</summary>
+
+Все клиентские попытки и ошибки, удаления, Ready endpoints и смена Pod IP
+на общей временной шкале. Жёлтым выделен период хаоса.
+
+<img src="./scrs/part2-03-continuity.png" width="100%" alt="1263 успешных запроса при 24 удалениях API Pod'ов">
+
+В Grafana показан более широкий интервал, включающий итоговый прогон:
+клиентская нагрузка сохраняется, а число ошибок остаётся нулевым.
+
+<img src="./scrs/part2-03-manual-grafana.png" width="100%" alt="Grafana: клиентские запросы, ошибки и доступность API во время хаоса">
+
+</details>
+
+---
 
 #### Ответы на вопросы части 2
 
@@ -298,13 +454,571 @@ Service не является самим Pod'ом. Это стабильная �
 состояние соответствующего endpoint. В частности, `conditions.ready` становится
 `false` либо endpoint исключается из списка готовых backend'ов. `kube-proxy` следит
 за Service и EndpointSlice и обновляет dataplane ноды — в нашем случае правила
-Service-маршрутизации в iptables. Поэтому новые запросы не должны направляться на
-неготовый Pod.
+Service/DNAT в iptables. Обновление этих правил и отправка SIGTERM контейнеру
+происходят асинхронно: приложение может уже закрыть listener, пока старое правило
+ещё направляет новые соединения на его endpoint. Поэтому даже при наличии трёх
+здоровых реплик отдельный запрос может завершиться ошибкой. Задержка `preStop`
+оставляет API принимающим запросы на время распространения обновлений.
 
-После этого Deployment создаёт новый Pod. Новый Pod обычно получает другой IP-адрес,
+Контроллер ReplicaSet, которым управляет Deployment, создаёт замену удалённому
+Pod'у. Новый Pod обычно получает другой IP-адрес,
 поэтому EndpointSlice изменяется дважды: старый endpoint удаляется или помечается
 как недоступный, а новый добавляется после прохождения readiness probe. Именно
 поэтому в ходе эксперимента важно было наблюдать не только список Pod'ов, но и
 `EndpointSlice`.
 
-**(to be continued...)**
+**Как взаимодействуют DNS, Service, EndpointSlice и kube-proxy?**
+
+Внутрикластерный генератор разрешает имя
+`shop-api.shop.svc.cluster.local` через CoreDNS. DNS возвращает ClusterIP
+Service'а `shop-api`, а не адрес конкретного Pod'а.
+
+Далее пакет попадает в dataplane ноды. В нашем кластере kube-proxy работает
+в режиме iptables: правило `KUBE-SERVICES` направляет трафик в цепочку
+`KUBE-SVC-*`, где выбирается один из готовых endpoint'ов. Цепочка
+`KUBE-SEP-*` выполняет DNAT на IP и порт выбранного Pod'а. Если Pod находится
+на другой ноде, Calico маршрутизирует пакет между нодами.
+
+EndpointSlice является источником актуального списка endpoint'ов для
+kube-proxy. При удалении или потере readiness Pod исключается из выбора,
+после чего kube-proxy перестраивает соответствующие iptables-правила.
+
+В данном эксперименте chaos-скрипт удаляет только API-поды, а `/health`
+обслуживается оставшимися API-репликами. Поэтому запросы обычно продолжают
+завершаться с кодом 200.
+
+**В каком режиме работает kube-proxy и когда заметна разница?**
+
+В этом кластере kube-proxy работает в режиме `iptables`. На это указывают
+цепочки `KUBE-SERVICES`, `KUBE-SVC-*` и `KUBE-SEP-*`, наблюдаемые в таблице
+`nat`. Режим работы также можно проверить, посмотрев конфигурацию соответствующего ConfigMap:
+
+<details>
+<summary>Демонстрация</summary>
+
+<img src="./scrs/part2-00-kubeproxy-mode.png" width="100%">
+</details>
+
+В режиме iptables kube-proxy реализует выбор endpoint'а цепочкой правил
+NAT. В режиме IPVS Service'ы и endpoint'ы представлены как виртуальные
+сервисы и real servers в IPVS.
+
+В небольшом кластере разница обычно почти незаметна функционально: оба
+режима обеспечивают Service-маршрутизацию и балансировку. Она становится
+заметнее при большом количестве Service'ов и endpoint'ов: iptables требует
+поддерживать длинные цепочки правил, а IPVS использует отдельные структуры
+ядра для поиска backend'а. В нашем эксперименте наблюдается
+именно изменение iptables-правил после обновления EndpointSlice.
+
+### Часть 3 — Спроектируй целевую матрицу доступа
+
+До введения ограничений проверили доступ постороннего Pod'а к PostgreSQL.
+В namespace `shop` Kubernetes NetworkPolicy отсутствовали. Pod с label
+`app.kubernetes.io/name=matrix-probe`, без labels API/worker, получил ответ БД.
+
+<details>
+<summary>Предустановка</summary>
+
+```bash
+k() { kubectl --context kind-lab5 -n shop "$@"; }
+LAB5_PROBE="matrix-probe-$(date +%s)"
+LAB5_PG_IMAGE=$(k get pods -l cnpg.io/cluster=shop-postgres \
+  -o jsonpath='{.items[0].spec.containers[?(@.name=="postgres")].image}')
+
+k run "$LAB5_PROBE" --image="$LAB5_PG_IMAGE" \
+  --image-pull-policy=IfNotPresent --restart=Never \
+  --labels='app.kubernetes.io/name=matrix-probe' --command -- sleep 600
+k wait --for=condition=Ready "pod/$LAB5_PROBE" --timeout=120s
+
+# Исходные политики, идентичность клиента и результат подключения.
+k get networkpolicy
+k get pod "$LAB5_PROBE" -o wide --show-labels
+k exec "$LAB5_PROBE" -- pg_isready -h shop-postgres-rw -p 5432 -t 3
+printf 'Exit code: %s\n' "$?"
+
+# После проверки удаляем временный Pod.
+k delete pod "$LAB5_PROBE" --wait=false
+```
+
+Для временного Pod используем образ текущей БД, содержащий `pg_isready`.
+Пароль БД для этой проверки не используется.
+
+</details>
+
+<details>
+<summary>Демонстрация</summary>
+
+Получили `accepting connections`: PostgreSQL доступен по сети
+из постороннего Pod'а. Эта проверка не подтверждает право читать данные.
+
+<img src="./scrs/part3-00-baseline.png" width="100%" alt="До применения NetworkPolicy: посторонний Pod matrix-probe подключается к PostgreSQL">
+
+</details>
+
+#### Целевая матрица
+
+Выбрали default-deny для ingress и egress Pod'ов namespace `shop`.
+Матрица описывает новые соединения; ответный трафик разрешённых соединений
+пропускается автоматически. Состояние «разрешено» ниже — проектное требование,
+которое проверим после применения политик.
+
+| Источник | Назначение | Протокол / порт назначения | Решение |
+|:--|:--|:--|:--|
+| Клиент стенда через NodePort | API | TCP: NodePort `32590` → Pod `8080` | Разрешить |
+| `chaos-load` | API | TCP: Service `80` → Pod `8080` | Разрешить |
+| API | PostgreSQL | TCP `5432` | Разрешить |
+| worker | PostgreSQL | TCP `5432` | Разрешить |
+| API | worker | Любой | Запретить |
+| worker | API | Любой | Запретить |
+| `chaos-load` | worker, PostgreSQL | Любой | Запретить |
+| Посторонний Pod | API, worker, PostgreSQL | Любой | Запретить |
+| API, worker, PostgreSQL, `chaos-load` | CoreDNS | UDP и TCP `53` | Разрешить |
+| Prometheus из `obs` | API, worker | TCP `8080` | Разрешить |
+| Оператор CNPG из `cnpg-system` | PostgreSQL | TCP `8000`, `5432` | Разрешить |
+| Instance manager в Pod PostgreSQL | Kubernetes API | TCP: Service `443` → endpoint `6443` | Разрешить |
+| Pod'ы `shop` | Интернет и остальные направления | Любой | Запретить |
+
+Последняя строка относится к направлениям, не перечисленным в разрешениях.
+Прямой обмен между API и worker не нужен: API записывает заказы в PostgreSQL,
+а worker асинхронно забирает их из БД. DNS разрешаем отдельно: разрешение TCP
+`5432` не позволяет отправить DNS-запрос для определения адреса Service.
+
+Служебные связи CNPG нужны для управления БД и обращения instance manager
+к Kubernetes API. В текущем стенде одна PostgreSQL-реплика; межподовая
+репликация не требуется. Требования оператора описаны в
+[документации CNPG](https://cloudnative-pg.io/docs/1.26/networking/).
+
+#### Идентификация участников
+
+Используем namespace и устойчивые labels вместо Pod IP:
+
+| Участник | Namespace | Labels |
+|:--|:--|:--|
+| API / worker | `shop` | `app.kubernetes.io/instance=shop` и `app.kubernetes.io/name=api` / `worker` |
+| PostgreSQL | `shop` | `cnpg.io/cluster=shop-postgres` |
+| Генератор нагрузки | `shop` | `app.kubernetes.io/name=chaos-load` |
+| CoreDNS | `kube-system` | `k8s-app=kube-dns` |
+| Prometheus | `obs` | `app.kubernetes.io/name=prometheus`, `prometheus=kps-prometheus` |
+| Оператор CNPG | `cnpg-system` | `app.kubernetes.io/name=cloudnative-pg`, `app.kubernetes.io/instance=cnpg` |
+
+У Pod PostgreSQL `app.kubernetes.io/instance=shop-postgres`, поэтому общий
+селектор `instance=shop` его не выбирает. Для внешнего клиента через NodePort
+учитываем адрес источника после NAT; pod labels к нему неприменимы.
+NetworkPolicy ограничивает IP и порты, поэтому доступ Prometheus к `8080`
+не ограничивается HTTP-путём `/metrics`.
+
+### Часть 4 — Включи zero trust
+
+Реализовали целевую матрицу через [шаблон NetworkPolicy](./charts/shop/templates/networkpolicies.yaml)
+в Helm chart `shop`. Селекторы, адреса и порты разрешённых связей задали в
+`networkPolicy.policies` в [values.yaml](./charts/shop/values.yaml).
+
+Применили девять политик: общий default-deny для ingress и egress всех Pod'ов
+namespace `shop` и восемь адресных разрешений. Отдельно разрешили DNS по
+UDP/TCP `53`, сбор метрик Prometheus и служебные связи CNPG. Пустой
+`podSelector: {}` в default-deny охватывает также PostgreSQL и посторонние Pod'ы.
+
+Для API/worker → PostgreSQL разрешили egress источника и ingress БД на TCP
+`5432`: разрешение только одной стороны не открывает соединение. Разрешения
+политик складываются, порядок их применения не задаёт приоритет.
+Для межпространственных связей объединили `namespaceSelector` и `podSelector`
+в одном элементе `from`/`to` — это AND. Раздельные элементы означали бы OR
+и расширили бы круг разрешённых участников.
+
+<details>
+<summary>Предустановка</summary>
+
+```bash
+helm --kube-context kind-lab5 upgrade shop charts/shop \
+  --namespace shop --reset-values --wait --timeout 5m
+
+bash scripts/check-shop-policy.sh
+```
+
+[Скрипт проверки](./scripts/check-shop-policy.sh) обращается к `/orders` по DNS
+из `chaos-load`, создаёт заказ через NodePort и ожидает обработки worker.
+Используем операции с БД, поскольку `/health` не проверяет её доступность.
+
+</details>
+
+<details>
+<summary>Демонстрация</summary>
+
+После применения политик получили HTTP `200` при обращении по DNS,
+создали заказ через NodePort и дождались `processed=true`. Все Pod'ы
+приложения остались Ready. Проверили основной путь работы приложения;
+полную матрицу разрешённых и запрещённых соединений проверим в части 5.
+
+<img src="./scrs/part4-00-policy.png" width="100%" alt="Девять NetworkPolicy применены: запрос по DNS успешен, заказ через NodePort создан и обработан worker">
+
+</details>
+
+### Часть 5 — Докажи матрицу на практике
+
+#### Ручное сравнение доступа к PostgreSQL
+
+Для наглядного сравнения используем один IP PostgreSQL и порт `5432`,
+меняя источник: API, worker и посторонний Pod. Обращаемся по IP, чтобы
+отделить доступ к БД от разрешения имени через DNS. После проверки запрета
+повторяем разрешённое подключение к той же БД.
+
+<details>
+<summary>Предустановка</summary>
+
+Используем диагностический образ [netprobe](./tools/netprobe/main.go),
+собранный через [Dockerfile.netprobe](./Dockerfile.netprobe) и загруженный
+в kind. Для distroless-приложений запускаем его в ephemeral containers
+внутри настоящих Pod'ов API и worker, сохраняя их сетевую идентичность.
+
+```bash
+docker build -f Dockerfile.netprobe -t ghcr.io/shop-lab/netprobe:v1 .
+kind load docker-image ghcr.io/shop-lab/netprobe:v1 --name lab5
+
+k() { kubectl --context kind-lab5 -n shop "$@"; }
+LAB5_API=$(k get pods -l app.kubernetes.io/name=api,app.kubernetes.io/instance=shop \
+  -o jsonpath='{.items[0].metadata.name}')
+LAB5_WORKER=$(k get pods -l app.kubernetes.io/name=worker,app.kubernetes.io/instance=shop \
+  -o jsonpath='{.items[0].metadata.name}')
+LAB5_PG_IP=$(k get pods -l cnpg.io/cluster=shop-postgres,cnpg.io/instanceRole=primary \
+  -o jsonpath='{.items[0].status.podIP}')
+LAB5_DEBUG="manual-$(date +%y%m%d)"
+LAB5_STRAY="matrix-$LAB5_DEBUG"
+
+for LAB5_POD in "$LAB5_API" "$LAB5_WORKER"; do
+  k debug "pod/$LAB5_POD" --container="$LAB5_DEBUG" \
+    --image=ghcr.io/shop-lab/netprobe:v1 --image-pull-policy=Never \
+    --profile=restricted --attach=false -- /netprobe hold
+done
+k wait --for=jsonpath="{.status.ephemeralContainerStatuses[?(@.name==\"$LAB5_DEBUG\")].state.running.startedAt}" \
+  "pod/$LAB5_API" "pod/$LAB5_WORKER" --timeout=90s
+
+k run "$LAB5_STRAY" --image=ghcr.io/shop-lab/netprobe:v1 \
+  --image-pull-policy=Never --restart=Never \
+  --labels=app.kubernetes.io/name=matrix-probe --command -- /netprobe hold
+k wait --for=condition=Ready "pod/$LAB5_STRAY" --timeout=90s
+```
+
+</details>
+
+```bash
+k get pods "$LAB5_API" "$LAB5_WORKER" "$LAB5_STRAY" \
+  -o wide -L app.kubernetes.io/name
+echo "PostgreSQL: $LAB5_PG_IP:5432"
+
+k exec "$LAB5_API" -c "$LAB5_DEBUG" -- /netprobe tcp "$LAB5_PG_IP" 5432
+k exec "$LAB5_WORKER" -c "$LAB5_DEBUG" -- /netprobe tcp "$LAB5_PG_IP" 5432
+k exec "$LAB5_STRAY" -- /netprobe tcp "$LAB5_PG_IP" 5432
+k exec "$LAB5_API" -c "$LAB5_DEBUG" -- /netprobe tcp "$LAB5_PG_IP" 5432
+```
+
+<details>
+<summary>Демонстрация</summary>
+
+API и worker подключились к PostgreSQL. Посторонний Pod получил тайм-аут,
+а повторное подключение из API прошло успешно: БД оставалась доступна.
+
+<img src="./scrs/part5-00-manual.png" width="100%" alt="Ручная проверка PostgreSQL: API и worker подключаются, посторонний Pod получает тайм-аут, повторная проверка API успешна">
+
+</details>
+
+#### Итоговая матрица
+
+Проверили матрицу [скриптом](./scripts/check-access-matrix.py) из всех текущих
+реплик. Каждая проба открывала новое соединение; TCP-запреты проверяли по IP,
+DNS — отдельно по UDP и TCP. Тайм-аут считали подтверждением запрета только
+при успешных контрольных подключениях к тому же назначению до и после
+эксперимента. Ошибки запуска и `connection refused` не засчитывали как запрет.
+
+<details>
+<summary>Предустановка</summary>
+
+На стенде с применёнными политиками и загруженным образом `netprobe`:
+
+```bash
+python3 scripts/check-access-matrix.py
+```
+
+</details>
+
+<details>
+<summary>Демонстрация</summary>
+
+Получили **38 успешных групп, 87 совпадений с ожиданиями**. API и worker
+подключались к PostgreSQL; посторонний Pod не подключался ни по Pod IP,
+ни по ClusterIP. DNS, мониторинг и служебные связи CNPG работали согласно
+матрице. Внешний egress проверили на `1.1.1.1:443`.
+Контрольные подключения до и после прогона прошли без повторов.
+
+В таблице `EXPECT` — ожидание, `ACTUAL` — результат, `MATCH` — число
+совпавших проб с учётом всех реплик. Проверены указанные назначения и порты.
+
+<img src="./scrs/part5-01-matrix.png" width="100%" alt="Матрица доступа: 38 групп PASS, 87 проб совпали с ожиданиями, положительные контроли прошли">
+
+</details>
+
+### Часть 6 — Найди скрытую сетевую неисправность
+
+Подготовили [скрипт](./scripts/hidden-fault.py), который случайно выбирает
+одну из четырёх неисправностей и применяет её через `values.yaml` и Helm:
+
+- неверный порт в egress-разрешении API/worker → PostgreSQL;
+- неверный label источника в ingress-разрешении PostgreSQL;
+- отсутствие DNS-разрешения для API/worker;
+- отсутствие egress-разрешения worker → PostgreSQL.
+
+Скрипт сохраняет исходную конфигурацию, не раскрывает выбранный вариант
+при запуске и перезапускает API/worker. Так проверяем новые подключения:
+старые соединения из пула могут пережить изменение NetworkPolicy
+и скрыть неисправность.
+
+<details>
+<summary>Предустановка</summary>
+
+Для скрипта внесения неисправности нужны Python 3 с PyYAML, Helm и kubectl.
+Goldmane и Whisker уже запущены в составе Calico. В отдельном терминале
+открыли Whisker на http://localhost:18081:
+
+```bash
+kubectl --context kind-lab5 -n calico-system port-forward svc/whisker 18081:8081
+```
+
+В другом терминале применили неисправность и запустили
+[проверку заказов](./scripts/exercise-orders.py):
+
+```bash
+python3 scripts/hidden-fault.py inject
+python3 scripts/exercise-orders.py --duration 120
+```
+
+</details>
+
+#### Симптом и путь диагностики
+
+1. Проверка показала `HTTP 200` на `/health`, но `POST /order` завершался
+   тайм-аутом: итог `DEGRADED`. API доступен клиенту, однако его health endpoint
+   не обращается к БД и не подтверждает работоспособность создания заказов.
+2. В Whisker нашли потоки `Deny` от API и worker к `shop-postgres-1`,
+   протокол TCP, порт назначения `5432`. В раскрытой записи worker
+   `reporter=Src`: блокировка зафиксирована на стороне источника, то есть egress.
+3. Сопоставили поток с целевой матрицей: эту связь должно разрешать правило
+   `app-to-postgres`. После локализации блокировки проверили конфигурацию:
+   в egress-разрешении стоял порт `5433` вместо `5432`.
+   Подключение к настоящему порту БД не совпадало с allow и попадало под
+   default deny. Отдельный запрет для `5432` не требовался.
+
+Таким образом, сначала по потокам определили заблокированную связь и сторону
+проверки, затем нашли несовпадение порта в разрешении. В деталях Calico виден
+`EndOfTier` с действием `Deny`; это не означает, что упомянутая рядом
+DNS-политика содержит явный запрет доступа к БД.
+
+<details>
+<summary>Демонстрация</summary>
+
+API отвечает на health, но создание заказов не работает:
+
+<img src="./scrs/part6-00-symptom.png" width="100%" alt="После внесения неисправности health отвечает 200, POST order завершается тайм-аутом, RESULT DEGRADED">
+
+Whisker показывает блокировку API/worker → PostgreSQL:5432;
+в деталях потока worker видны Deny и reporter Src:
+
+<img src="./scrs/part6-01-denied-flow.png" width="100%" alt="Calico Whisker: Deny от API и worker к shop-postgres-1 TCP 5432, reporter Src">
+
+</details>
+
+#### Исправление и повторная проверка
+
+Вернули сохранённые значения: порт egress-разрешения снова `5432`.
+Скрипт применил chart и перезапустил API/worker. Затем проверили обработку
+заказов и повторили полную матрицу на новых соединениях:
+
+```bash
+python3 scripts/hidden-fault.py restore
+python3 scripts/exercise-orders.py --duration 30
+python3 scripts/check-access-matrix.py
+```
+
+Получили **6 созданных и обработанных заказов**, `HTTP 201`,
+`processed=true`, итог `OK`. Повторная матрица дала **38 групп PASS,
+87 совпадений с ожиданиями**; положительные контроли до и после прошли.
+Восстановились необходимые связи, при этом запрещённые соединения,
+включая посторонний Pod → PostgreSQL, остались заблокированными.
+Одной проверки заказа для этого было бы недостаточно: она использует
+только часть разрешённых связей и не проверяет сохранение запретов.
+
+<details>
+<summary>Демонстрация</summary>
+
+После исправления новые заказы создаются и обрабатываются:
+
+<img src="./scrs/part6-02-recovered-requests.png" width="100%" alt="Восстановление конфигурации и шесть успешно обработанных заказов, RESULT OK">
+
+Повторная проверка всей матрицы:
+
+<img src="./scrs/part6-03-recovered-matrix.png" width="100%" alt="Матрица после исправления: разрешения и запреты совпадают с ожиданиями, контроли PASS, RESULT PASS">
+
+</details>
+
+### Часть 7 — Мониторинг сети
+
+Использовали существующий Prometheus/Grafana из лабы 2. В `shop` chart
+добавили [экспортёр и ServiceMonitor](./charts/shop/templates/flow-metrics.yaml),
+[сетевые правила](./charts/shop/templates/network-prometheusrule.yaml)
+и [дашборд Shop — Network policy & DNS](./charts/shop/dashboards/network.json).
+Пороги и длительности заданы в `monitoring.network.alerts`
+[values.yaml](./charts/shop/values.yaml). Существующие RED-алерты сохранены.
+
+#### Источники метрик и проверка сбора
+
+| Что наблюдаем | Источник | Что означает метрика |
+|---|---|---|
+| Соединения | `node_nf_conntrack_entries` и `node_nf_conntrack_entries_limit` существующего node-exporter | Заполнение таблицы отслеживания соединений всей ноды; не только shop и не только TCP |
+| Запрещённый трафик | [flow-metrics](./tools/flow-metrics/README.md), читающий API Whisker v3.30.3 | Агрегированные наблюдения Deny-пакетов за окно 120 секунд, с сохранением reporter Src/Dst; не число уникальных соединений |
+| DNS health | Существующий CoreDNS ServiceMonitor: `up`, `coredns_dns_responses_total`, `coredns_dns_requests_total` | Доступность сбора метрик, запросы и ответы по rcode, включая SERVFAIL |
+
+Экспортёр работает в `obs`, читает потоки с namespace источника `shop`
+каждые 15 секунд и не имеет Kubernetes API token или привилегированного
+доступа к нодам. Отдельные NetworkPolicy разрешают ему DNS и Whisker,
+а Prometheus — сбор метрик экспортёра. Доступ к приложению не расширяли.
+
+Число Deny за скользящее окно — **gauge**, поэтому `rate()` к нему
+не применяем: значение уменьшается при выходе старых событий из окна.
+Ошибка чтения Whisker не превращается в нулевой Deny: экспортёр выставляет
+`collector_success=0`, а метрики данных не публикует. На дашборде отдельно
+видны доступность экспортёра и возраст потоков. Recording rule обязательных
+Deny использует только успешный сбор и данные моложе 180 секунд.
+
+<details>
+<summary>Предустановка</summary>
+
+```bash
+docker build -f Dockerfile.flow-metrics -t ghcr.io/shop-lab/flow-metrics:v1 .
+kind load docker-image ghcr.io/shop-lab/flow-metrics:v1 --name lab5
+helm --kube-context kind-lab5 upgrade shop charts/shop \
+  -n shop --reset-values --wait --timeout 5m
+```
+
+После обнаружения ServiceMonitor и обновления scrape проверили источники
+и загрузку правил через Prometheus на `localhost:9090`:
+
+```bash
+python3 scripts/check-network-monitoring.py
+python3 scripts/check-network-monitoring.py --rules
+```
+
+Дашборд доступен через Grafana: http://localhost:3000/d/shop-network.
+
+</details>
+
+<details>
+<summary>Демонстрация</summary>
+
+Получили метрики conntrack с трёх нод, две доступные цели CoreDNS,
+успешный сбор свежих потоков и нулевой Deny на обязательных связях:
+
+<img src="./scrs/part7-00-metric-sources.png" width="100%" alt="Восемь проверок источников сетевых метрик: PASS">
+
+После загрузки правил все три сетевых алерта имеют `health=ok`, `inactive`:
+
+<img src="./scrs/part7-01-metric-update.png" width="100%" alt="Применение Helm chart и проверка трёх сетевых правил: ok, inactive, PASS">
+
+Исходное состояние дашборда, без активных сетевых алертов.
+На панели `Network alerts` нет рядов, поскольку `ALERTS` публикуются
+для состояний pending/firing; исправность источников проверяем отдельно:
+
+<img src="./scrs/part7-02-grafana-new.png" width="100%" alt="Сетевой дашборд до эксперимента: телеметрия доступна, Deny равен нулю, две цели CoreDNS UP">
+
+</details>
+
+#### Три сетевых алерта и их обоснование
+
+| Алерт | Условие | Обоснование |
+|---|---|---|
+| `ShopConntrackPressure` | Заполнение conntrack >80% в течение 2 минут | Запас до предела таблицы позволяет заметить риск отказа новых отслеживаемых потоков до её переполнения |
+| `ShopRequiredTrafficDenied` | Deny на API/worker → PostgreSQL TCP 5432 или CoreDNS UDP/TCP 53 присутствует в окне минимум 30 секунд | Это нарушение целевой матрицы и необходимой приложению связи; ожидаемые запреты постороннему Pod не включены |
+| `ShopDNSUnhealthy` | SERVFAIL >5% ответов либо нет доступных целей CoreDNS; условие сохраняется 1 минуту | Обнаруживает ошибки DNS-сервера или потерю доступности его метрик; NXDOMAIN показан отдельно и не считается SERVFAIL |
+
+`up=1` подтверждает успешный scrape **Prometheus → CoreDNS:9153**,
+но не проверяет **API → CoreDNS:53**. Запросы, отброшенные политикой
+до CoreDNS, не попадают в его счётчики ответов. Их блокировку обнаруживаем
+по потокам Calico и алерту обязательных связей.
+
+Для правил прошли восемь сценариев [promtool-тестов](./scripts/test-network-rules.py):
+исправное состояние и ожидаемые запреты, задержка срабатывания и восстановление,
+сбой/устаревание телеметрии, SERVFAIL, недоступные и отсутствующие DNS targets.
+
+#### Реальное срабатывание и восстановление
+
+Повторно запустили случайную неисправность. В этом эксперименте скрипт
+исключил API и worker из DNS-разрешения. После перезапуска Pod'ов приложение
+не могло разрешить имя БД: `/health` отвечал `200`, а шесть попыток
+`POST /order` завершились тайм-аутом, итог `DEGRADED`.
+
+```bash
+python3 scripts/hidden-fault.py inject
+python3 scripts/exercise-orders.py --duration 30
+python3 scripts/watch-network-alert.py --expect firing --timeout 240
+```
+
+[Наблюдатель](./scripts/watch-network-alert.py) зафиксировал переход
+`pending → firing`: **30 октября 2026 года в 21:07:31 МСК** значение Deny
+в окне составило **54**, `collector_success=1`, `up=1`, возраст потоков —
+около **16,6 секунды**. Пороги алерта для демонстрации не меняли.
+
+<details>
+<summary>Демонстрация</summary>
+
+Тайм-ауты заказов и подтверждённый `firing` при исправном сборе метрик:
+
+<img src="./scrs/part7-03-alert-firing.png" width="100%" alt="Реальная блокировка DNS приложения: DEGRADED и переход ShopRequiredTrafficDenied из pending в firing">
+
+На дашборде видны рост Deny и сработавший алерт. Позднее значение окна
+достигло 204 пакетов. При этом обе цели CoreDNS оставались UP,
+а SERVFAIL — нулевым: блокировка происходила до доставки DNS-запроса серверу.
+
+<img src="./scrs/part7-04-dashboard.png" width="100%" alt="Дашборд во время неисправности: 204 Deny-пакета в окне и ShopRequiredTrafficDenied firing при двух доступных целях CoreDNS">
+
+</details>
+
+Восстановили сохранённые значения, применили chart и проверили заказы:
+
+```bash
+python3 scripts/hidden-fault.py restore
+python3 scripts/exercise-orders.py --duration 30
+python3 scripts/watch-network-alert.py --expect resolved --timeout 240
+python3 scripts/check-network-monitoring.py --rules
+```
+
+Шесть новых заказов получили `HTTP 201` и `processed=true`, итог `OK`.
+В **21:12:51 МСК** наблюдатель подтвердил `inactive`, **Deny=0**,
+`collector_success=1`, `up=1` и свежесть потоков около **21,4 секунды**.
+Последующая проверка источников и трёх правил завершилась `PASS`.
+Исходный `values.yaml` восстановлен полностью.
+
+У этого правила **нет отдельного cooldown**: `keep_firing_for` не задан
+(в API `keepFiringFor=0`). `for: 30s` задерживает срабатывание, а не снятие
+алерта. После исправления старые Deny могут оставаться в окне 120 секунд;
+также требуется время на агрегацию, scrape и вычисление правил. Когда условие
+перестаёт выполняться, алерт становится inactive на очередной оценке.
+
+Само исчезновение алерта не доказывает восстановление: при сбое сборщика
+recording rule тоже перестаёт выдавать значение. Поэтому проверили вместе
+обработку заказов, нулевой Deny, доступность и свежесть телеметрии.
+Отдельного алерта на потерю экспортёра среди этих трёх правил нет;
+такое состояние видно на панелях доступности и возраста данных.
+
+<details>
+<summary>Демонстрация</summary>
+
+Восстановление заказов, снятие алерта и итоговая проверка метрик:
+
+<img src="./scrs/part7-05-alert-resolved.png" width="100%" alt="Шесть заказов успешно обработаны, алерт inactive, Deny равен нулю, телеметрия исправна, проверки PASS">
+
+Дашборд после восстановления: Deny вернулся к нулю, сбор потоков работает,
+обе цели CoreDNS доступны. В интервале последних 30 минут осталась история
+всплеска Deny и состояний pending/firing; линии алерта заканчиваются после
+восстановления. Значение `Last*` в легенде показывает последнюю точку ряда
+с данными (`lastNotNull`), а не текущее состояние алерта.
+
+<img src="./scrs/part7-06-dashboard-restored.png" width="100%" alt="Дашборд после восстановления: Deny равен нулю, телеметрия доступна, на графиках видны завершившиеся всплеск Deny и срабатывание алерта">
+
+</details>

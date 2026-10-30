@@ -1,0 +1,154 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.network.enabled }}
+{{- $name := printf "%s-flow-metrics" (include "shop.fullname" .) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Values.monitoring.network.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: collector
+          image: {{ .Values.monitoring.network.image | quote }}
+          imagePullPolicy: {{ .Values.monitoring.network.imagePullPolicy }}
+          env:
+            - name: WHISKER_URL
+              value: {{ .Values.monitoring.network.whiskerURL | quote }}
+            - name: SOURCE_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+          ports:
+            - name: metrics
+              containerPort: 9095
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            initialDelaySeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Values.monitoring.network.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ $name }}
+  ports:
+    - name: metrics
+      port: 9095
+      targetPort: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  jobLabel: app.kubernetes.io/name
+  namespaceSelector:
+    matchNames: [{{ .Values.monitoring.network.namespace | quote }}]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.monitoring.interval }}
+      scrapeTimeout: {{ .Values.monitoring.scrapeTimeout }}
+---
+# This policy adds only the collector's access to the operator-owned Whisker.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-to-whisker
+  namespace: {{ .Values.monitoring.network.calicoNamespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: whisker
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.monitoring.network.namespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ $name }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.monitoring.network.whiskerPort }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Values.monitoring.network.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+              prometheus: kps-prometheus
+      ports:
+        - protocol: TCP
+          port: 9095
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.monitoring.network.calicoNamespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: whisker
+      ports:
+        - protocol: TCP
+          port: {{ .Values.monitoring.network.whiskerPort }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+{{- end }}
