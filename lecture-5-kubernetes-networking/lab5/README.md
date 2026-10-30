@@ -606,3 +606,49 @@ k delete pod "$LAB5_PROBE" --wait=false
 учитываем адрес источника после NAT; pod labels к нему неприменимы.
 NetworkPolicy ограничивает IP и порты, поэтому доступ Prometheus к `8080`
 не ограничивается HTTP-путём `/metrics`.
+
+### Часть 4 — Включи zero trust
+
+Реализовали целевую матрицу через [шаблон NetworkPolicy](./charts/shop/templates/networkpolicies.yaml)
+в Helm chart `shop`. Селекторы, адреса и порты разрешённых связей задали в
+`networkPolicy.policies` в [values.yaml](./charts/shop/values.yaml).
+
+Применили девять политик: общий default-deny для ingress и egress всех Pod'ов
+namespace `shop` и восемь адресных разрешений. Отдельно разрешили DNS по
+UDP/TCP `53`, сбор метрик Prometheus и служебные связи CNPG. Пустой
+`podSelector: {}` в default-deny охватывает также PostgreSQL и посторонние Pod'ы.
+
+Для API/worker → PostgreSQL разрешили egress источника и ingress БД на TCP
+`5432`: разрешение только одной стороны не открывает соединение. Разрешения
+политик складываются, порядок их применения не задаёт приоритет.
+Для межпространственных связей объединили `namespaceSelector` и `podSelector`
+в одном элементе `from`/`to` — это AND. Раздельные элементы означали бы OR
+и расширили бы круг разрешённых участников.
+
+<details>
+<summary>Предустановка</summary>
+
+```bash
+helm --kube-context kind-lab5 upgrade shop charts/shop \
+  --namespace shop --reset-values --wait --timeout 5m
+
+bash scripts/check-shop-policy.sh
+```
+
+[Скрипт проверки](./scripts/check-shop-policy.sh) обращается к `/orders` по DNS
+из `chaos-load`, создаёт заказ через NodePort и ожидает обработки worker.
+Используем операции с БД, поскольку `/health` не проверяет её доступность.
+
+</details>
+
+<details>
+<summary>Демонстрация</summary>
+
+После применения политик получили HTTP `200` при обращении по DNS,
+создали заказ через NodePort и дождались `processed=true`. Все Pod'ы
+приложения остались Ready. Проверили основной путь работы приложения;
+полную матрицу разрешённых и запрещённых соединений проверим в части 5.
+
+<img src="./scrs/part4-00-policy.png" width="100%" alt="Девять NetworkPolicy применены: запрос по DNS успешен, заказ через NodePort создан и обработан worker">
+
+</details>
